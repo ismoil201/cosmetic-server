@@ -1,11 +1,15 @@
 plugins {
-    java
+    id("java")
     id("org.springframework.boot") version "3.3.5"
     id("io.spring.dependency-management") version "1.1.6"
 }
 
 group = "com.example"
 version = "0.0.1-SNAPSHOT"
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+}
 
 repositories {
     mavenCentral()
@@ -33,6 +37,11 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
-    enabled = true
+// ❗ BOOTJAR NI YOQAMIZ
+tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    archiveFileName.set("app.jar")
+}
+
+tasks.getByName<Jar>("jar") {
+    enabled = false
 }

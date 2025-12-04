@@ -14,4 +14,5 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
 
 server:
+  address: 0.0.0.0     # ⬅ Railway uchun shart, aks holda 502 bo‘ladi
   port: ${PORT:8080}
