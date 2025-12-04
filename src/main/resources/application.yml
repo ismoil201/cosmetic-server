@@ -1,18 +1,17 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:shopdb
-    driverClassName: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:mysql://gondola.proxy.rlwy.net:48131/railway?useSSL=false&serverTimezone=UTC
+    username: root
+    password: kofWgIwqhZqDqbcPPlYktBcgFQfbKlci
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-
-  h2:
-    console:
-      enabled: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
 
 server:
   port: ${PORT:8080}
