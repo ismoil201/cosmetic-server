@@ -7,12 +7,6 @@ plugins {
 group = "com.example"
 version = "0.0.1-SNAPSHOT"
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17)) // Railway uchun 17
-    }
-}
-
 repositories {
     mavenCentral()
 }
@@ -41,8 +35,4 @@ tasks.withType<Test> {
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     enabled = true
-}
-
-tasks.named<Jar>("jar") {
-    enabled = false
 }
