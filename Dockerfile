@@ -1,23 +1,12 @@
-# ---- Build stage ----
+# ---- Build Stage ----
 FROM gradle:8.5-jdk17 AS builder
 WORKDIR /app
-
-# faqat gradle wrapperlarni ruxsat berish
-COPY gradlew .
-COPY gradle gradle
-
-# butun projectni nusxalash
 COPY . .
+RUN gradle clean build -x test
 
-# testlarni o‘tkazmasdan build qilish
-RUN chmod +x gradlew
-RUN ./gradlew clean build -x test
-
-# ---- Run stage ----
-FROM openjdk:17-jdk-slim
+# ---- Run Stage ----
+FROM eclipse-temurin:17-jdk
 WORKDIR /app
-
-# build bo‘lgan jarni olish
 COPY --from=builder /app/build/libs/*.jar app.jar
 
 EXPOSE 8080
