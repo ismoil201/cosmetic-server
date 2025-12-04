@@ -8,11 +8,6 @@ group = "com.example"
 version = "0.0.1-SNAPSHOT"
 description = "cosmetic project for Spring Boot"
 
-java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
-}
 
 configurations {
 	compileOnly {
