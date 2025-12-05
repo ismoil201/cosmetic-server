@@ -2,6 +2,7 @@ package com.example.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+
 @Entity
 @Table(name = "users")
 @Data
@@ -16,4 +17,7 @@ public class User {
 
     private String password;
     private String fullName;
+
+    @Enumerated(EnumType.STRING)
+    private Role role;   // ADMIN yoki USER
 }
