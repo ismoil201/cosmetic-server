@@ -26,8 +26,10 @@ public class SecurityConfig {
 
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> {}) // ⭐ CORS yoqildi
+                .cors(cors -> {})
                 .authorizeHttpRequests(auth -> auth
+                        // ⭐ Ochiq endpointlar (GET products)
+                        .requestMatchers("/api/products", "/api/products/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .httpBasic(basic -> {});
@@ -35,15 +37,15 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // ⭐⭐ GLOBAL CORS CONFIG — barcha frontend domenlarga ruxsat
+    // ⭐ GLOBAL CORS CONFIG — to‘g‘ri ishlaydigan variant
     @Bean
     public CorsFilter corsFilter() {
 
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
 
-        // Qaysi domain kirishi mumkin → frontend domenini yoz!
-        config.setAllowedOrigins(List.of(
+        // ⭐ MUHIM: allowedOrigins emas, allowedOriginPatterns ishlatamiz!
+        config.setAllowedOriginPatterns(List.of(
                 "http://localhost:3000",
                 "http://localhost:5173",
                 "http://127.0.0.1:5500",
