@@ -2,6 +2,7 @@ package com.example.backend.controller;
 
 import com.example.backend.dto.LoginDto;
 import com.example.backend.dto.RegisterDto;
+import com.example.backend.entity.Role;
 import com.example.backend.entity.User;
 import com.example.backend.repository.UserRepository;
 import com.example.backend.service.JwtService;
@@ -35,10 +36,15 @@ public class AuthController {
         u.setEmail(dto.getEmail());
         u.setPassword(encoder.encode(dto.getPassword()));
         u.setFullName(dto.getFullName());
+
+        // ⭐ Yangi user har doim USER bo'ladi
+        u.setRole(Role.USER);
+
         userRepository.save(u);
 
         return ResponseEntity.ok("Registered!");
     }
+
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginDto dto) {
