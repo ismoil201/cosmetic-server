@@ -45,14 +45,17 @@ public class JwtFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(
                             email,
                             null,
-                            List.of(() -> "ROLE_" + role) // ⭐ MUHIM
+                            List.of(() -> "ROLE_" + role)
                     );
 
             auth.setDetails(
                     new WebAuthenticationDetailsSource().buildDetails(request)
             );
 
+            auth.setAuthenticated(true); // ⭐⭐ SHU YETISHMAYOTGAN EDI
+
             SecurityContextHolder.getContext().setAuthentication(auth);
+
         }
 
         chain.doFilter(request, response);
