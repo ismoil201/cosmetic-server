@@ -4,20 +4,21 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
-@Table(name = "cart_items",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "product_id"}))
+@Table(name = "order_items")
 @Data
-public class CartItem {
+public class OrderItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    private User user;
+    private Order order;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     private Product product;
 
     private int quantity;
+
+    private double price; // ❗ snapshot (discount bilan)
 }

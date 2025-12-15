@@ -1,13 +1,16 @@
 package com.example.backend.entity;
 
-import com.example.backend.dto.OrderStatus;
 import jakarta.persistence.*;
 import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "orders")
 @Data
 public class Order {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -16,9 +19,20 @@ public class Order {
     private User user;
 
     private String address;
+    private String phone;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
 
     private double totalAmount;
+
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    private List<OrderItem> items;
+
+    @PrePersist
+    public void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 }

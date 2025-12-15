@@ -5,10 +5,11 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class LoginResponse {
+public class UserProfileResponse {
+
     private Long id;
     private String email;
     private String fullName;
-    private String token;
+    private String phone;
+    private String profileImage;
 }
-

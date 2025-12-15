@@ -1,96 +1,54 @@
 package com.example.backend.controller;
 
-import com.example.backend.dto.ProductDto;
+import com.example.backend.dto.ProductCreateRequest;
+import com.example.backend.dto.ProductDetailResponse;
 import com.example.backend.dto.ProductResponse;
-import com.example.backend.entity.Product;
-import com.example.backend.entity.User;
-import com.example.backend.repository.FavoriteRepository;
-import com.example.backend.repository.ProductRepository;
-import com.example.backend.repository.UserRepository;
+import com.example.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
 public class ProductController {
 
-    private final ProductRepository productRepo;
-    private final UserRepository userRepo;
-    private final FavoriteRepository favRepo;
+    private final ProductService productService;
 
-    // CREATE
-    @PostMapping
-    public ResponseEntity<Product> create(@RequestBody ProductDto dto) {
-        Product p = new Product();
-        p.setName(dto.getName());
-        p.setDescription(dto.getDescription());
-        p.setPrice(dto.getPrice());
-        p.setImageUrl(dto.getImageUrl());
-        p.setCategory(dto.getCategory());
-
-        return ResponseEntity.ok(productRepo.save(p));
-    }
-
-    // GET ALL (HOME)
+    // HOME
     @GetMapping
-    public List<Product> all() {
-        return productRepo.findAll();
+    public Page<ProductResponse> list(Pageable pageable) {
+        return productService.getHomeProducts(pageable);
     }
 
-    // ✅ GET BY ID + FAVORITE CHECK
+    // DETAIL
     @GetMapping("/{id}")
-    public ProductResponse getById(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long userId
-    ) {
-        Product product = productRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
-
-        boolean favorite = false;
-
-        if (userId != null) {
-            User user = userRepo.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-
-            favorite = favRepo.findByUserAndProduct(user, product).isPresent();
-        }
-
-        return new ProductResponse(
-                product.getId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getImageUrl(),
-                product.getCategory(),
-                favorite
-        );
+    public ProductDetailResponse detail(@PathVariable Long id) {
+        return productService.getDetail(id);
     }
 
-    // UPDATE
+    // CREATE (ADMIN)
+    @PostMapping
+    public ResponseEntity<?> create(@RequestBody ProductCreateRequest req) {
+        productService.create(req);
+        return ResponseEntity.ok("Created");
+    }
+
+    // UPDATE (ADMIN)
     @PutMapping("/{id}")
-    public ResponseEntity<Product> update(
+    public ResponseEntity<?> update(
             @PathVariable Long id,
-            @RequestBody ProductDto dto
+            @RequestBody ProductCreateRequest req
     ) {
-        Product p = productRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
-
-        p.setName(dto.getName());
-        p.setDescription(dto.getDescription());
-        p.setPrice(dto.getPrice());
-        p.setImageUrl(dto.getImageUrl());
-        p.setCategory(dto.getCategory());
-
-        return ResponseEntity.ok(productRepo.save(p));
+        productService.update(id, req);
+        return ResponseEntity.ok("Updated");
     }
 
-    // DELETE
+    // DELETE (ADMIN)
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        productRepo.deleteById(id);
-        return ResponseEntity.ok("Deleted!");
+        productService.delete(id);
+        return ResponseEntity.ok("Deleted");
     }
 }

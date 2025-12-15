@@ -1,54 +1,44 @@
 package com.example.backend.service;
 
+import com.example.backend.dto.UserProfileResponse;
 import com.example.backend.entity.User;
 import com.example.backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Optional;
-
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository userRepository;
+    private final UserRepository userRepo;
 
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public User getCurrentUser() {
+        String email = SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getName();
+
+        return userRepo.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    // Get all users
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public UserProfileResponse getProfile() {
+        User user = getCurrentUser();
+        return new UserProfileResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhone(),
+                user.getProfileImage()
+        );
+    }
+    public void updateProfile(UserProfileResponse req) {
+        User user = getCurrentUser();
+        user.setFullName(req.getFullName());
+        user.setPhone(req.getPhone());
+        user.setProfileImage(req.getProfileImage());
+        userRepo.save(user);
     }
 
-    // Get user by id
-    public Optional<User> getUserById(Long id) {
-        return userRepository.findById(id);
-    }
-
-    // Create user
-    public User createUser(User user) {
-        return userRepository.save(user);
-    }
-
-    // Update user
-    public User updateUser(Long id, User newUser) {
-        return userRepository.findById(id)
-                .map(existingUser -> {
-                    existingUser.setEmail(newUser.getEmail());
-                    existingUser.setFullName(newUser.getFullName());
-                    existingUser.setPassword(newUser.getPassword());
-                    return userRepository.save(existingUser);
-                })
-                .orElse(null);
-    }
-
-    // Delete user
-    public boolean deleteUser(Long id) {
-        if (userRepository.existsById(id)) {
-            userRepository.deleteById(id);
-            return true;
-        }
-        return false;
-    }
 }

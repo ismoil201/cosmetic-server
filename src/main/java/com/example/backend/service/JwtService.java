@@ -10,12 +10,14 @@ import java.util.Date;
 @Service
 public class JwtService {
 
+    private final String SECRET =
+            "1234567890123456789012345678901234567890123456789012345678901234";
 
-    private final String SECRET = "1234567890123456789012345678901234567890123456789012345678901234";
+    public String generateToken(String email, String role) {
 
-    public String generateToken(String email) {
         return Jwts.builder()
                 .setSubject(email)
+                .claim("role", role) // ⭐ ROLE QO‘SHILDI
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 86400000))
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()))
@@ -31,4 +33,13 @@ public class JwtService {
                 .getSubject();
     }
 
+    public String extractRole(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(Keys.hmacShaKeyFor(SECRET.getBytes()))
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("role", String.class);
+    }
 }
+

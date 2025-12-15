@@ -6,14 +6,19 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class ProductResponse {
+public class ProductDetailResponse {
 
     private Long id;
     private String name;
+    private String description;
     private String brand;
+
     private double price;
     private double discountPrice;
+
     private String imageUrl;
     private Category category;
+
+    private int stock;
     private boolean favorite;
 }
