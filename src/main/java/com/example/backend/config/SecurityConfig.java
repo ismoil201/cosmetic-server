@@ -13,8 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-
-import java.util.List;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -31,9 +29,26 @@ public class SecurityConfig {
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/products/**").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                        // 🔓 PUBLIC
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/api/products/**"
+                        ).permitAll()
+
+                        // 🔐 USER (MUSINSA STYLE)
+                        .requestMatchers(
+                                "/api/users/**",
+                                "/api/favorites/**",
+                                "/api/cart/**",
+                                "/api/orders/**"
+                        ).hasAnyRole("USER", "ADMIN")
+
+                        // 🔒 ADMIN
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMIN")
+
+                        // ❗ BOSHQA HAMMASI
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -46,4 +61,3 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 }
-
