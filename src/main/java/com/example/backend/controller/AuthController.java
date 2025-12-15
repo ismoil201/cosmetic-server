@@ -45,9 +45,9 @@ public class AuthController {
         return ResponseEntity.ok("Registered!");
     }
 
-
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginDto dto) {
+
         User user = userRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -56,6 +56,15 @@ public class AuthController {
         }
 
         String token = jwtService.generateToken(user.getEmail());
-        return ResponseEntity.ok(Map.of("token", token));
+
+        LoginResponse response = new LoginResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                token
+        );
+
+        return ResponseEntity.ok(response);
     }
+
 }
