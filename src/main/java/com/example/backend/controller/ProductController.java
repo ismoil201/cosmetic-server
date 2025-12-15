@@ -1,20 +1,25 @@
 package com.example.backend.controller;
 
 import com.example.backend.dto.ProductDto;
+import com.example.backend.dto.ProductResponse;
 import com.example.backend.entity.Product;
+import com.example.backend.entity.User;
+import com.example.backend.repository.FavoriteRepository;
 import com.example.backend.repository.ProductRepository;
+import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
 public class ProductController {
 
-    private final ProductRepository repo;
+    private final ProductRepository productRepo;
+    private final UserRepository userRepo;
+    private final FavoriteRepository favRepo;
 
     // CREATE
     @PostMapping
@@ -26,22 +31,42 @@ public class ProductController {
         p.setImageUrl(dto.getImageUrl());
         p.setCategory(dto.getCategory());
 
-        return ResponseEntity.ok(repo.save(p));
+        return ResponseEntity.ok(productRepo.save(p));
     }
 
-    // GET ALL
+    // GET ALL (HOME)
     @GetMapping
     public List<Product> all() {
-        return repo.findAll();
+        return productRepo.findAll();
     }
 
-    // GET BY ID
+    // ✅ GET BY ID + FAVORITE CHECK
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getById(@PathVariable Long id) {
-        Product p = repo.findById(id)
+    public ProductResponse getById(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long userId
+    ) {
+        Product product = productRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        return ResponseEntity.ok(p);
+        boolean favorite = false;
+
+        if (userId != null) {
+            User user = userRepo.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            favorite = favRepo.findByUserAndProduct(user, product).isPresent();
+        }
+
+        return new ProductResponse(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getPrice(),
+                product.getImageUrl(),
+                product.getCategory(),
+                favorite
+        );
     }
 
     // UPDATE
@@ -50,7 +75,7 @@ public class ProductController {
             @PathVariable Long id,
             @RequestBody ProductDto dto
     ) {
-        Product p = repo.findById(id)
+        Product p = productRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
         p.setName(dto.getName());
@@ -59,14 +84,13 @@ public class ProductController {
         p.setImageUrl(dto.getImageUrl());
         p.setCategory(dto.getCategory());
 
-        return ResponseEntity.ok(repo.save(p));
+        return ResponseEntity.ok(productRepo.save(p));
     }
 
     // DELETE
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        repo.deleteById(id);
+        productRepo.deleteById(id);
         return ResponseEntity.ok("Deleted!");
     }
-
 }
