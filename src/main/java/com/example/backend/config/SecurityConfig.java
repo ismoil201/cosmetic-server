@@ -39,13 +39,16 @@ public class SecurityConfig {
                                 "/api/products/**"
                         ).permitAll()
 
-                        // 🔒 ADMIN
-                        .requestMatchers("/api/admin/**")
-                        .hasRole("ADMIN")
+                        // ❤️ FAVORITES (USER)
+                        .requestMatchers("/api/favorites/**").authenticated()
 
-                        // 🔐 USER
+                        // 🔒 ADMIN
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                        // 🔐 QOLGANLAR
                         .anyRequest().authenticated()
                 )
+
 
                 // ⭐ JWT FILTER QO‘SHILDI
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
