@@ -1,13 +1,17 @@
 package com.example.backend.controller;
 
-import com.example.backend.dto.ProductDto;
+import com.example.backend.dto.FavoriteRequest;
+import com.example.backend.entity.Favorite;
 import com.example.backend.entity.Product;
+import com.example.backend.entity.User;
+import com.example.backend.repository.FavoriteRepository;
 import com.example.backend.repository.ProductRepository;
+import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/favorites")
 @RequiredArgsConstructor
@@ -18,10 +22,13 @@ public class FavoriteController {
     private final ProductRepository productRepo;
 
     @PostMapping("/toggle")
-    public Map<String, Boolean> toggle(@RequestBody CartRequest req) {
+    public Map<String, Boolean> toggle(@RequestBody FavoriteRequest req) {
 
-        User user = userRepo.findById(req.getUserId()).orElseThrow();
-        Product product = productRepo.findById(req.getProductId()).orElseThrow();
+        User user = userRepo.findById(req.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Product product = productRepo.findById(req.getProductId())
+                .orElseThrow(() -> new RuntimeException("Product not found"));
 
         return favRepo.findByUserAndProduct(user, product)
                 .map(fav -> {
@@ -37,4 +44,3 @@ public class FavoriteController {
                 });
     }
 }
-

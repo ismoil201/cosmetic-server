@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://gondola.proxy.rlwy.net:48131/railway?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://gondola.proxy.rlwy.net:48131/railway?useSSL=false&allowPublicKeyRetrieval=true&autoReconnect=true&serverTimezone=UTC
     username: root
     password: kofWgIwqhZqDqbcPPlYktBcgFQfbKlci
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -14,5 +14,4 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
 
 server:
-  address: 0.0.0.0     # ⬅ Railway uchun shart, aks holda 502 bo‘ladi
   port: ${PORT:8080}
