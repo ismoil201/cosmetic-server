@@ -30,13 +30,14 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
 
-                        // 🔓 PUBLIC
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/api/products/**"
-                        ).permitAll()
+                        // 🔓 PRE-FLIGHT (MUHIM)
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 🔐 USER (MUSINSA STYLE)
+                        // 🔓 PUBLIC
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/products/**").permitAll()
+
+                        // 🔐 USER
                         .requestMatchers(
                                 "/api/users/**",
                                 "/api/favorites/**",
@@ -45,11 +46,11 @@ public class SecurityConfig {
                         ).hasAnyRole("USER", "ADMIN")
 
                         // 🔒 ADMIN
-                        .requestMatchers("/api/admin/**")
-                        .hasRole("ADMIN")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        // ❗ BOSHQA HAMMASI
                         .anyRequest().authenticated()
+
+
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
