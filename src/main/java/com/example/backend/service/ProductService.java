@@ -23,7 +23,7 @@ public class ProductService {
     public Page<ProductResponse> getHomeProducts(Pageable pageable) {
         User user = userService.getCurrentUser();
 
-        return productRepo.findByActiveTrue(pageable)
+        return productRepo.findAll(pageable) // ⭐ MUHIM
                 .map(p -> new ProductResponse(
                         p.getId(),
                         p.getName(),
@@ -35,6 +35,7 @@ public class ProductService {
                         favRepo.existsByUserAndProduct(user, p)
                 ));
     }
+
 
     public ProductDetailResponse getDetail(Long productId) {
         User user = userService.getCurrentUser();

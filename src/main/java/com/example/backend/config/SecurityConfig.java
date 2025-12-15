@@ -21,23 +21,39 @@ public class SecurityConfig {
     private final JwtFilter jwtFilter;
 
     @Bean
+    public org.springframework.web.filter.CorsFilter corsFilter() {
+
+        var config = new org.springframework.web.cors.CorsConfiguration();
+        config.setAllowCredentials(true);
+        config.addAllowedOriginPattern("*");
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
+
+        var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+
+        return new org.springframework.web.filter.CorsFilter(source);
+    }
+
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
+                .cors(cors -> {}) // ⭐ MUHIM
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm ->
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
 
-                        // 🔓 PRE-FLIGHT (MUHIM)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 🔓 PUBLIC
+                        // PUBLIC
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/products/**").permitAll()
 
-                        // 🔐 USER
+                        // USER
                         .requestMatchers(
                                 "/api/users/**",
                                 "/api/favorites/**",
@@ -45,12 +61,10 @@ public class SecurityConfig {
                                 "/api/orders/**"
                         ).hasAnyRole("USER", "ADMIN")
 
-                        // 🔒 ADMIN
+                        // ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
-
-
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
