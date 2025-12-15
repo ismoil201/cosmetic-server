@@ -53,13 +53,20 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/products/**").permitAll()
 
-                        // USER
-                        .requestMatchers(
-                                "/api/users/**",
-                                "/api/favorites/**",
-                                "/api/cart/**",
-                                "/api/orders/**"
-                        ).hasAnyRole("USER", "ADMIN")
+//                        // USER
+//                        .requestMatchers(
+//                                "/api/users/**",
+//                                "/api/favorites/**",
+//                                "/api/cart/**",
+//                                "/api/orders/**"
+//                        ).hasAnyRole("USER", "ADMIN")
+                                .requestMatchers(
+                                        "/api/users/**",
+                                        "/api/favorites/**",
+                                        "/api/cart/**",
+                                        "/api/orders/**"
+                                ).authenticated()
+
 
                         // ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
