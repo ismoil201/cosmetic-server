@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -25,39 +26,45 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
-            FilterChain chain
+            FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
+        String authHeader = request.getHeader("Authorization");
 
-        if (header == null || !header.startsWith("Bearer ")) {
-            chain.doFilter(request, response);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
             return;
         }
 
-        String token = header.substring(7);
-        String email = jwtService.extractEmail(token);
-        String role = jwtService.extractRole(token);
+        String token = authHeader.substring(7);
+
+        String email;
+        String role;
+        try {
+            email = jwtService.extractEmail(token);
+            role = jwtService.extractRole(token);
+        } catch (Exception e) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(
+            // ✅ SPRING SECURITY 6 TO‘G‘RI USUL
+            UsernamePasswordAuthenticationToken authentication =
+                    UsernamePasswordAuthenticationToken.authenticated(
                             email,
                             null,
-                            List.of(() -> "ROLE_" + role)
+                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
                     );
 
-            auth.setDetails(
+            authentication.setDetails(
                     new WebAuthenticationDetailsSource().buildDetails(request)
             );
 
-            auth.setAuthenticated(true); // ⭐⭐ SHU YETISHMAYOTGAN EDI
-
-            SecurityContextHolder.getContext().setAuthentication(auth);
-
+            SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
-        chain.doFilter(request, response);
+        filterChain.doFilter(request, response);
     }
 }
