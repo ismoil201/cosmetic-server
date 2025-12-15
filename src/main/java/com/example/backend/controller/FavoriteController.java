@@ -2,11 +2,12 @@ package com.example.backend.controller;
 
 import com.example.backend.dto.FavoriteRequest;
 import com.example.backend.entity.Favorite;
-import com.example.backend.entity.Product;
 import com.example.backend.entity.User;
+import com.example.backend.entity.Product;
 import com.example.backend.repository.FavoriteRepository;
-import com.example.backend.repository.ProductRepository;
 import com.example.backend.repository.UserRepository;
+import com.example.backend.repository.ProductRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

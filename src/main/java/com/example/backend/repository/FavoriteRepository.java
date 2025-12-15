@@ -1,8 +1,8 @@
 package com.example.backend.repository;
 
 import com.example.backend.entity.Favorite;
-import com.example.backend.entity.Product;
 import com.example.backend.entity.User;
+import com.example.backend.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
