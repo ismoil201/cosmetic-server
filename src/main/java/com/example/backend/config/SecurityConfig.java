@@ -4,7 +4,6 @@ import com.example.backend.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -33,12 +32,11 @@ public class SecurityConfig {
                         // 🔓 AUTH
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // 🔓 PUBLIC PRODUCTS (MUHIM FIX)
-                        .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        // 🔓 PUBLIC PRODUCTS (🔥 METHOD YO‘Q!)
+                        .requestMatchers("/api/products/**").permitAll()
 
-                        // 🔓 OPTIONS (CORS)
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // 🔓 ERROR (MUHIM!)
+                        .requestMatchers("/error").permitAll()
 
                         // 🔐 QOLGAN HAMMASI
                         .anyRequest().authenticated()
