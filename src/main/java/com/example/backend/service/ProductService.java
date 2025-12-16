@@ -22,19 +22,36 @@ public class ProductService {
     private final UserService userService;
 
     public Page<ProductResponse> getHomeProducts(Pageable pageable) {
+
         User user = userService.getCurrentUserOrNull();
 
-        return productRepo.findAll(pageable) // ⭐ MUHIM
-                .map(p -> new ProductResponse(
-                        p.getId(),
-                        p.getName(),
-                        p.getBrand(),
-                        p.getPrice(),
-                        p.getDiscountPrice(),
-                        p.getImageUrl(),
-                        p.getCategory(),
-                        favRepo.existsByUserAndProduct(user, p)
-                ));
+        Page<Product> page = productRepo.findAll(pageable);
+
+        // 🔓 TOKEN YO‘Q → favorite = false
+        if (user == null) {
+            return page.map(p -> new ProductResponse(
+                    p.getId(),
+                    p.getName(),
+                    p.getBrand(),
+                    p.getPrice(),
+                    p.getDiscountPrice(),
+                    p.getImageUrl(),
+                    p.getCategory(),
+                    false
+            ));
+        }
+
+        // 🔐 TOKEN BOR
+        return page.map(p -> new ProductResponse(
+                p.getId(),
+                p.getName(),
+                p.getBrand(),
+                p.getPrice(),
+                p.getDiscountPrice(),
+                p.getImageUrl(),
+                p.getCategory(),
+                favRepo.existsByUserAndProduct(user, p)
+        ));
     }
 
 
