@@ -7,5 +7,7 @@ public enum Category {
     PANTS,
     SHOES,
     BAG,
-    ACCESSORY
+    ACCESSORY,
+    COSMETICS
+
 }
