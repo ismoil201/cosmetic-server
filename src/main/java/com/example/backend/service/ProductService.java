@@ -39,6 +39,7 @@ public class ProductService {
 
 
     public ProductDetailResponse getDetail(Long productId) {
+
         User user = userService.getCurrentUserOrNull();
 
         Product p = productRepo.findById(productId)
@@ -46,6 +47,11 @@ public class ProductService {
 
         p.setViewCount(p.getViewCount() + 1);
         productRepo.save(p);
+
+        boolean favorite = false;
+        if (user != null) {
+            favorite = favRepo.existsByUserAndProduct(user, p);
+        }
 
         return new ProductDetailResponse(
                 p.getId(),
@@ -57,7 +63,7 @@ public class ProductService {
                 p.getImageUrl(),
                 p.getCategory(),
                 p.getStock(),
-                favRepo.existsByUserAndProduct(user, p)
+                favorite
         );
     }
 
