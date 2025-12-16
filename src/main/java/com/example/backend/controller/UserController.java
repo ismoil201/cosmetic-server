@@ -3,11 +3,13 @@ package com.example.backend.controller;
 import com.example.backend.dto.UserProfileResponse;
 import com.example.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class UserController {
 
     private final UserService userService;
@@ -18,8 +20,8 @@ public class UserController {
     }
 
     @PutMapping("/me")
-    public ResponseEntity<?> update(@RequestBody UserProfileResponse req) {
+    public String update(@RequestBody UserProfileResponse req) {
         userService.updateProfile(req);
-        return ResponseEntity.ok("Updated");
+        return "Updated";
     }
 }

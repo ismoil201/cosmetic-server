@@ -15,15 +15,18 @@ public class UserService {
     private final UserRepository userRepo;
 
     public User getCurrentUser() {
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
-        return userRepo.findByEmail(email)
+        if (auth == null ||
+                !auth.isAuthenticated() ||
+                auth.getPrincipal().equals("anonymousUser")) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        return userRepo.findByEmail(auth.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
-public User getCurrentUserOrNull() {
+    public User getCurrentUserOrNull() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
         if (auth == null ||

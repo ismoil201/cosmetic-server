@@ -43,6 +43,7 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             email = jwtService.extractEmail(token);
             role = jwtService.extractRole(token);
+            if (role == null) role = "USER";
         } catch (Exception e) {
             filterChain.doFilter(request, response);
             return;

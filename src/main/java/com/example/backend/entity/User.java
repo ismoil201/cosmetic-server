@@ -1,13 +1,17 @@
 package com.example.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+
 public class User {
 
     @Id
@@ -26,7 +30,8 @@ public class User {
     private String profileImage;       // 👤 avatar
 
     @Enumerated(EnumType.STRING)
-    private Role role;                 // USER / ADMIN
+    @Column(nullable = false)
+    private Role role = Role.USER;                // USER / ADMIN
 
     private boolean active = true;     // ❗ user bloklash uchun
 

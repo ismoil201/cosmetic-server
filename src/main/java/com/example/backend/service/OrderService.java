@@ -7,6 +7,7 @@ import com.example.backend.repository.OrderItemRepository;
 import com.example.backend.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -19,6 +20,7 @@ public class OrderService {
     private final CartRepository cartRepo;
     private final UserService userService;
 
+    @Transactional
     public OrderResponse create(OrderCreateRequest req) {
         User user = userService.getCurrentUser();
         List<CartItem> cartItems = cartRepo.findByUser(user);
@@ -70,7 +72,9 @@ public class OrderService {
 
     // ✅ YO‘Q EDI
     public OrderResponse detail(Long orderId) {
+        User user = userService.getCurrentUser();
         Order order = orderRepo.findById(orderId)
+                .filter(o -> o.getUser().equals(user) || user.getRole() == Role.ADMIN)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
         List<OrderItemResponse> items = orderItemRepo.findByOrder(order)

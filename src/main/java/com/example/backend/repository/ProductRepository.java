@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    // 🏠 HOME (active products)
+    // 🏠 HOME (faqat active productlar)
     Page<Product> findByActiveTrue(Pageable pageable);
 
     // 🔎 Category filter
@@ -18,5 +18,5 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Page<Product> findByBrandAndActiveTrue(String brand, Pageable pageable);
 
     // 💰 Sale products
-    Page<Product> findByDiscountPriceGreaterThan(double price, Pageable pageable);
+    Page<Product> findByDiscountPriceGreaterThanAndActiveTrue(double price, Pageable pageable);
 }

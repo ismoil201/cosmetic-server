@@ -62,7 +62,7 @@ public class ProductService {
         Product p = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        p.setViewCount(p.getViewCount() + 1);
+        p.setViewCount(p.getViewCount() + 3);
         productRepo.save(p);
 
         boolean favorite = false;
@@ -110,9 +110,12 @@ public class ProductService {
         p.setPrice(req.getPrice());
         p.setDiscountPrice(req.getDiscountPrice());
         p.setImageUrl(req.getImageUrl());
-        p.setCategory(
-                Category.valueOf(req.getCategory().toUpperCase())
-        );
+        try {
+            p.setCategory(Category.valueOf(req.getCategory().toUpperCase()));
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid category");
+        }
+
         p.setStock(req.getStock());
     }
 

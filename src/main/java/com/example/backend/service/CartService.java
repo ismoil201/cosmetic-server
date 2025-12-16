@@ -66,9 +66,11 @@ public class CartService {
 
     // ✅ YO‘Q EDI
     public void updateQuantity(Long cartItemId, int quantity) {
+        User user = userService.getCurrentUser();
         CartItem item = cartRepo.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
-        item.setQuantity(quantity);
+                .filter(c -> c.getUser().equals(user))
+                .orElseThrow(() -> new RuntimeException("Access denied"));
+
         cartRepo.save(item);
     }
 

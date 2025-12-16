@@ -1,13 +1,16 @@
 package com.example.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "products")
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Product {
 
     @Id
@@ -25,8 +28,9 @@ public class Product {
 
     private String imageUrl;
 
-    private String brand;              // ⭐ Musinsa core
-
+    private String brand;
+    // ⭐ Musinsa core
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private Category category;
 

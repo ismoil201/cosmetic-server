@@ -1,14 +1,17 @@
 package com.example.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 
 @Entity
 @Table(
         name = "favorites",
         uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "product_id"})
 )
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Favorite {
 
     @Id

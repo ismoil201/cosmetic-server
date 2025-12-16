@@ -4,7 +4,7 @@ import com.example.backend.dto.CartAddRequest;
 import com.example.backend.dto.CartItemResponse;
 import com.example.backend.service.CartService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,38 +12,34 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/cart")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class CartController {
 
     private final CartService cartService;
 
-    // ADD
     @PostMapping
-    public ResponseEntity<?> add(@RequestBody CartAddRequest req) {
+    public String add(@RequestBody CartAddRequest req) {
         cartService.add(req);
-        return ResponseEntity.ok("Added");
+        return "Added";
     }
 
-    // LIST
     @GetMapping
     public List<CartItemResponse> list() {
         return cartService.getMyCart();
     }
 
-    // UPDATE QTY
     @PutMapping("/{cartItemId}")
-    public ResponseEntity<?> updateQty(
+    public String updateQty(
             @PathVariable Long cartItemId,
             @RequestParam int quantity
     ) {
         cartService.updateQuantity(cartItemId, quantity);
-        return ResponseEntity.ok("Updated");
+        return "Updated";
     }
 
-    // DELETE
     @DeleteMapping("/{cartItemId}")
-    public ResponseEntity<?> delete(@PathVariable Long cartItemId) {
+    public String delete(@PathVariable Long cartItemId) {
         cartService.delete(cartItemId);
-        return ResponseEntity.ok("Deleted");
+        return "Deleted";
     }
 }
-
