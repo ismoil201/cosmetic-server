@@ -19,13 +19,13 @@ public class ProductController {
 
     private final ProductService productService;
 
-    // 🔓 PUBLIC
+    // 🔓 PUBLIC (TOKEN KERAK EMAS)
     @GetMapping
     public List<ProductResponse> list(Pageable pageable) {
         return productService.getHomeProducts(pageable).getContent();
     }
 
-    // 🔓 PUBLIC
+    // 🔓 PUBLIC (TOKEN KERAK EMAS)
     @GetMapping("/{id}")
     public ProductDetailResponse detail(@PathVariable Long id) {
         return productService.getDetail(id);
