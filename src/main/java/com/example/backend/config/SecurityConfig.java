@@ -14,7 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableMethodSecurity // 🔥 @PreAuthorize ishlashi uchun SHART
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -33,16 +33,16 @@ public class SecurityConfig {
                         // 🔓 AUTH
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // 🔓 PUBLIC PRODUCTS
+                        // 🔓 PUBLIC PRODUCTS (MUHIM FIX)
+                        .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
 
                         // 🔓 OPTIONS (CORS)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 🔐 QOLGANLAR
+                        // 🔐 QOLGAN HAMMASI
                         .anyRequest().authenticated()
                 )
-                // 🔥 JWT FILTER MAJBURIY
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
