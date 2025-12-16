@@ -22,7 +22,7 @@ public class ProductService {
     private final UserService userService;
 
     public Page<ProductResponse> getHomeProducts(Pageable pageable) {
-        User user = userService.getCurrentUser();
+        User user = userService.getCurrentUserOrNull();
 
         return productRepo.findAll(pageable) // ⭐ MUHIM
                 .map(p -> new ProductResponse(
@@ -39,7 +39,7 @@ public class ProductService {
 
 
     public ProductDetailResponse getDetail(Long productId) {
-        User user = userService.getCurrentUser();
+        User user = userService.getCurrentUserOrNull();
 
         Product p = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));

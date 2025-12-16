@@ -4,6 +4,7 @@ import com.example.backend.dto.UserProfileResponse;
 import com.example.backend.entity.User;
 import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,18 @@ public class UserService {
 
         return userRepo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+public User getCurrentUserOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (auth == null ||
+                !auth.isAuthenticated() ||
+                auth.getPrincipal().equals("anonymousUser")) {
+            return null;
+        }
+
+        String email = auth.getName();
+        return userRepo.findByEmail(email).orElse(null);
     }
 
     public UserProfileResponse getProfile() {
