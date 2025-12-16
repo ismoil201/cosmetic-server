@@ -25,7 +25,7 @@ public class ProductService {
 
         User user = userService.getCurrentUserOrNull();
 
-        Page<Product> page = productRepo.findAll(pageable);
+        Page<Product> page = productRepo.findByActiveTrue(pageable);
 
         // 🔓 TOKEN YO‘Q → favorite = false
         if (user == null) {
