@@ -14,7 +14,8 @@ public class ProductCreateRequest {
     private double discountPrice;
 
     private String imageUrl;
-    private Category category;
+    // DTO
+    private String category;
 
     private int stock;
 }

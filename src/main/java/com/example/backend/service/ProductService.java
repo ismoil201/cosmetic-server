@@ -3,6 +3,7 @@ package com.example.backend.service;
 import com.example.backend.dto.ProductCreateRequest;
 import com.example.backend.dto.ProductDetailResponse;
 import com.example.backend.dto.ProductResponse;
+import com.example.backend.entity.Category;
 import com.example.backend.entity.Product;
 import com.example.backend.entity.User;
 import com.example.backend.repository.FavoriteRepository;
@@ -86,7 +87,10 @@ public class ProductService {
         p.setPrice(req.getPrice());
         p.setDiscountPrice(req.getDiscountPrice());
         p.setImageUrl(req.getImageUrl());
-        p.setCategory(req.getCategory());
+        p.setCategory(
+                Category.valueOf(req.getCategory().toUpperCase())
+        );
         p.setStock(req.getStock());
     }
+
 }
