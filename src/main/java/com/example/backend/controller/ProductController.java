@@ -18,26 +18,41 @@ public class ProductController {
 
     private final ProductService productService;
 
-    // ✅ HOME (ANDROIDGA MOS)
     @GetMapping
     public List<ProductResponse> list(Pageable pageable) {
-        return productService
-                .getHomeProducts(pageable)
-                .getContent(); // ⭐ MUHIM
+        return productService.getHomeProducts(pageable).getContent();
     }
 
-    // DETAIL
     @GetMapping("/{id}")
     public ProductDetailResponse detail(@PathVariable Long id) {
         return productService.getDetail(id);
     }
-
-    // CREATE (ADMIN)
     @PostMapping
     public ResponseEntity<?> create(@RequestBody ProductCreateRequest req) {
         productService.create(req);
         return ResponseEntity.ok("Created");
     }
+//
+//    // ✅ HOME (ANDROIDGA MOS)
+//    @GetMapping
+//    public List<ProductResponse> list(Pageable pageable) {
+//        return productService
+//                .getHomeProducts(pageable)
+//                .getContent(); // ⭐ MUHIM
+//    }
+//
+//    // DETAIL
+//    @GetMapping("/{id}")
+//    public ProductDetailResponse detail(@PathVariable Long id) {
+//        return productService.getDetail(id);
+//    }
+
+    // CREATE (ADMIN)
+//    @PostMapping
+//    public ResponseEntity<?> create(@RequestBody ProductCreateRequest req) {
+//        productService.create(req);
+//        return ResponseEntity.ok("Created");
+//    }
 
     // UPDATE (ADMIN)
     @PutMapping("/{id}")
