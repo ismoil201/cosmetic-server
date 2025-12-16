@@ -38,40 +38,13 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
         http
-                .cors(cors -> {}) // ⭐ MUHIM
+                .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm ->
-                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // PUBLIC
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/products/**").permitAll()
-
-//                        // USER
-//                        .requestMatchers(
-//                                "/api/users/**",
-//                                "/api/favorites/**",
-//                                "/api/cart/**",
-//                                "/api/orders/**"
-//                        ).hasAnyRole("USER", "ADMIN")
-                                .requestMatchers(
-                                        "/api/users/**",
-                                        "/api/favorites/**",
-                                        "/api/cart/**",
-                                        "/api/orders/**"
-                                ).authenticated()
-
-
-                        // ADMIN
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()   // 🔥 HAMMASI OCHIQ (TEST)
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
