@@ -1,5 +1,6 @@
 package com.example.backend.controller;
 
+import com.example.backend.dto.FirebaseLoginRequest;
 import com.example.backend.dto.LoginRequest;
 import com.example.backend.dto.LoginResponse;
 import com.example.backend.dto.RegisterRequest;
@@ -25,4 +26,9 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest req) {
         return ResponseEntity.ok(authService.login(req));
     }
+    @PostMapping("/firebase")
+    public LoginResponse firebase(@RequestBody FirebaseLoginRequest req) {
+        return authService.firebaseLogin(req.getIdToken());
+    }
+
 }

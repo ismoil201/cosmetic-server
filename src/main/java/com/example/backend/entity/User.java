@@ -21,8 +21,9 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
-    @Column(nullable = false)
-    private String password;
+    @Column(nullable = true)
+    private String password; // firebase userlarda null bo‘ladi
+
 
     private String fullName;
 
@@ -36,6 +37,10 @@ public class User {
     private boolean active = true;     // ❗ user bloklash uchun
 
     private LocalDateTime createdAt;
+    @Enumerated(EnumType.STRING)
+    private AuthProvider provider; // GOOGLE, APPLE, PHONE
+
+    private String providerId; // firebase uid
 
     @PrePersist
     public void onCreate() {
