@@ -29,6 +29,17 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+
+        // 🔓 PUBLIC ENDPOINTLAR — TOKEN UMUMAN TEKSHIRILMAYDI
+        if (
+                path.startsWith("/api/auth") ||
+                        path.startsWith("/api/products")
+        ) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -38,32 +49,34 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        String email;
-        String role;
-        try {
-            email = jwtService.extractEmail(token);
-            role = jwtService.extractRole(token);
-            if (role == null) role = "USER";
-        } catch (Exception e) {
+        if (token.isBlank() || token.equalsIgnoreCase("null")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        try {
+            String email = jwtService.extractEmail(token);
+            String role = jwtService.extractRole(token);
+            if (role == null) role = "USER";
 
-            // ✅ SPRING SECURITY 6 TO‘G‘RI USUL
-            UsernamePasswordAuthenticationToken authentication =
-                    UsernamePasswordAuthenticationToken.authenticated(
-                            email,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                    );
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            authentication.setDetails(
-                    new WebAuthenticationDetailsSource().buildDetails(request)
-            );
+                UsernamePasswordAuthenticationToken authentication =
+                        UsernamePasswordAuthenticationToken.authenticated(
+                                email,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                        );
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                authentication.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+
+        } catch (Exception e) {
+            SecurityContextHolder.clearContext(); // 🔥 MUHIM
         }
 
         filterChain.doFilter(request, response);
