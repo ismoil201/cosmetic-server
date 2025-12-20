@@ -70,7 +70,7 @@ public class CartService {
         CartItem item = cartRepo.findById(cartItemId)
                 .filter(c -> c.getUser().equals(user))
                 .orElseThrow(() -> new RuntimeException("Access denied"));
-
+        item.setQuantity(quantity);
         cartRepo.save(item);
     }
 
