@@ -20,6 +20,9 @@ public class ProductDetailResponse {
     private Category category;
 
     private int stock;
+
+    private double ratingAvg;
+    private int reviewCount;
     private boolean favorite;
 
     private List<ProductImageResponse> images;

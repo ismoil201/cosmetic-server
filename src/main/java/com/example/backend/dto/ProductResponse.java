@@ -16,7 +16,10 @@ public class ProductResponse {
     private double price;
     private double discountPrice;
     private Category category;
+    private double ratingAvg;
+    private int reviewCount;
     private boolean favorite;
+
 
     private List<ProductImageResponse> images;
 }

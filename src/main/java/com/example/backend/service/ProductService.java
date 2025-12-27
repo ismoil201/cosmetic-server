@@ -77,9 +77,12 @@ public class ProductService {
                     product.getPrice(),
                     product.getDiscountPrice(),
                     product.getCategory(),
+                    product.getRatingAvg(),
+                    product.getReviewCount(),
                     favorite,
                     images
             );
+
         });
     }
 
@@ -118,9 +121,12 @@ public class ProductService {
                 p.getDiscountPrice(),
                 p.getCategory(),
                 p.getStock(),
+                p.getRatingAvg(),     // 🔥
+                p.getReviewCount(),   // 🔥
                 favorite,
                 images
         );
+
     }
 
     /* ================= UPDATE ================= */
