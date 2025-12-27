@@ -9,11 +9,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/orders")
-@RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class OrderController {
+
+    private final OrderService orderService;
 
     @GetMapping
     public List<OrderResponse> history() {
@@ -29,6 +31,5 @@ public class OrderController {
     public OrderResponse detail(@PathVariable Long orderId) {
         return orderService.detail(orderId);
     }
-
-    private final OrderService orderService;
 }
+

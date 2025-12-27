@@ -5,6 +5,7 @@ import com.example.backend.dto.ProductDetailResponse;
 import com.example.backend.dto.ProductResponse;
 import com.example.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,8 +22,8 @@ public class ProductController {
 
     // 🔓 PUBLIC (TOKEN KERAK EMAS)
     @GetMapping
-    public List<ProductResponse> list(Pageable pageable) {
-        return productService.getHomeProducts(pageable).getContent();
+    public Page<ProductResponse> list(Pageable pageable) {
+        return productService.getHomeProducts(pageable);
     }
 
     // 🔓 PUBLIC (TOKEN KERAK EMAS)

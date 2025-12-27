@@ -13,11 +13,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
-    //ADMIN FILTER
-    Page<User> findByActive(Boolean active, Pageable pageable);
+    Page<User> findByActive(boolean active, Pageable pageable);
 
     Optional<User> findByPhone(String phone);
 
-
     boolean existsByEmail(String email);
 }
+

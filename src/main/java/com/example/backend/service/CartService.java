@@ -6,7 +6,7 @@ import com.example.backend.dto.ProductResponse;
 import com.example.backend.entity.CartItem;
 import com.example.backend.entity.Product;
 import com.example.backend.entity.User;
-import com.example.backend.repository.CartRepository;
+import com.example.backend.repository.CartItemRepository;
 import com.example.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,16 +17,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CartService {
 
-    private final CartRepository cartRepo;
+    private final CartItemRepository cartRepo;
     private final ProductRepository productRepo;
     private final UserService userService;
 
     public void add(CartAddRequest req) {
         User user = userService.getCurrentUser();
+
         Product product = productRepo.findById(req.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        cartRepo.findByUserAndProduct(user, product)
+        cartRepo.findByUserIdAndProductId(user.getId(), product.getId())
                 .ifPresentOrElse(
                         item -> {
                             item.setQuantity(item.getQuantity() + req.getQuantity());
@@ -45,7 +46,7 @@ public class CartService {
     public List<CartItemResponse> getMyCart() {
         User user = userService.getCurrentUser();
 
-        return cartRepo.findByUser(user)
+        return cartRepo.findByUserId(user.getId())
                 .stream()
                 .map(c -> new CartItemResponse(
                         c.getId(),
@@ -64,17 +65,17 @@ public class CartService {
                 .toList();
     }
 
-    // ✅ YO‘Q EDI
     public void updateQuantity(Long cartItemId, int quantity) {
         User user = userService.getCurrentUser();
+
         CartItem item = cartRepo.findById(cartItemId)
-                .filter(c -> c.getUser().equals(user))
+                .filter(c -> c.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new RuntimeException("Access denied"));
+
         item.setQuantity(quantity);
         cartRepo.save(item);
     }
 
-    // ✅ YO‘Q EDI
     public void delete(Long cartItemId) {
         cartRepo.deleteById(cartItemId);
     }

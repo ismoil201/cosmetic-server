@@ -11,19 +11,18 @@ import org.springframework.data.domain.Pageable;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    // ✅ ADMIN FILTER (active=true/false)
+    // ✅ ADMIN
+    Page<Product> findByActive(boolean active, Pageable pageable);
 
-    Page<Product> findByActive(Boolean active, Pageable pageable);
-
-    // 🏠 HOME (faqat active productlar)
+    // 🏠 HOME
     Page<Product> findByActiveTrue(Pageable pageable);
 
-    // 🔎 Category filter
+    // 🔎 CATEGORY
     Page<Product> findByCategoryAndActiveTrue(Category category, Pageable pageable);
 
-    // 🔥 Brand filter
+    // 🔥 BRAND
     Page<Product> findByBrandAndActiveTrue(String brand, Pageable pageable);
 
-    // 💰 Sale products
-    Page<Product> findByDiscountPriceGreaterThanAndActiveTrue(double price, Pageable pageable);
+    // 💰 SALE (discount bor)
+    Page<Product> findByDiscountPriceGreaterThanAndActiveTrue(double discountPrice, Pageable pageable);
 }

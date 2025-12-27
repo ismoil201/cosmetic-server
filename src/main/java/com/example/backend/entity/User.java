@@ -4,46 +4,51 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-
 @Entity
 @Table(name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false, unique = true)
     private String email;
 
     @Column(nullable = true)
-    private String password; // firebase userlarda null bo‘ladi
+    private String password; // firebase userlarda null
 
-
+    @Column(name = "full_name")
     private String fullName;
 
-    private String phone;              // 📱 buyurtma uchun
-    private String profileImage;       // 👤 avatar
+    private String phone;
+
+    @Column(name = "profile_image")
+    private String profileImage;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Role role = Role.USER;                // USER / ADMIN
+    private Role role = Role.USER;
 
-    private boolean active = true;     // ❗ user bloklash uchun
+    @Column(nullable = false)
+    private boolean active = true;
 
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-    @Enumerated(EnumType.STRING)
-    private AuthProvider provider; // GOOGLE, APPLE, PHONE
 
-    private String providerId; // firebase uid
+    @Enumerated(EnumType.STRING)
+    private AuthProvider provider;
+
+    @Column(name = "provider_id")
+    private String providerId;
 
     @PrePersist
     public void onCreate() {
         createdAt = LocalDateTime.now();
     }
 }
+
