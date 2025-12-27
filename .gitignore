@@ -1,2 +1,18 @@
 src/main/resources/firebase-service-account.json
-/build/
+# Gradle
+.gradle/
+build/
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+out/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# JAR
+*.jar
