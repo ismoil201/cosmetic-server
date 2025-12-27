@@ -33,7 +33,7 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok")
 
     // MySQL
-    runtimeOnly("com.mysql:mysql-connector-j")
+    runtimeOnly("com.mysql:mysql-connector-j:8.4.0")
 }
 
 tasks.withType<Test> {
