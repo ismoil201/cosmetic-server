@@ -69,11 +69,14 @@ public class CartService {
                                     c.getProduct().getPrice(),
                                     c.getProduct().getDiscountPrice(),
                                     c.getProduct().getCategory(),
+                                    c.getProduct().getRatingAvg(),     // 🔥 QO‘SHILDI
+                                    c.getProduct().getReviewCount(),   // 🔥 QO‘SHILDI
                                     false,
                                     List.of(
                                             new ProductImageResponse(imageUrl, true)
                                     )
-                            ),
+                            )
+                            ,
                             c.getQuantity()
                     );
                 })
