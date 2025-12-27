@@ -5,6 +5,7 @@ import com.example.backend.entity.*;
 import com.example.backend.repository.CartItemRepository;
 import com.example.backend.repository.OrderItemRepository;
 import com.example.backend.repository.OrderRepository;
+import com.example.backend.repository.ProductImageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,8 @@ public class OrderService {
     private final OrderItemRepository orderItemRepo;
     private final CartItemRepository cartRepo;
     private final UserService userService;
+    private final ProductImageRepository productImageRepo;
+
 
     @Transactional
     public OrderResponse create(OrderCreateRequest req) {
@@ -73,23 +76,34 @@ public class OrderService {
     }
 
     public OrderResponse detail(Long orderId) {
+
         User user = userService.getCurrentUser();
 
         Order order = orderRepo.findById(orderId)
-                .filter(o -> o.getUser().getId().equals(user.getId())
-                        || user.getRole() == Role.ADMIN)
+                .filter(o ->
+                        o.getUser().getId().equals(user.getId())
+                                || user.getRole() == Role.ADMIN
+                )
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
         List<OrderItemResponse> items = orderItemRepo.findByOrderId(order.getId())
                 .stream()
-                .map(i -> new OrderItemResponse(
-                        i.getProduct().getId(),
-                        i.getProduct().getName(),
-                        i.getProduct().getImageUrl(),
-                        i.getPrice(),
-                        i.getQuantity()
-                ))
-                .toList();
+                .map(i -> {
+
+                    String imageUrl = productImageRepo
+                            .findByProductIdAndMainTrue(i.getProduct().getId())
+                            .map(ProductImage::getImageUrl)
+                            .orElse(null);
+
+                    return new OrderItemResponse(
+                            i.getProduct().getId(),
+                            i.getProduct().getName(),
+                            imageUrl,
+                            i.getPrice(),
+                            i.getQuantity()
+                    );
+                })
+                .toList(); // 🔥 MUHIM
 
         return new OrderResponse(
                 order.getId(),
@@ -99,6 +113,7 @@ public class OrderService {
                 items
         );
     }
+
 
     // ADMIN
     public List<OrderResponse> allOrders() {

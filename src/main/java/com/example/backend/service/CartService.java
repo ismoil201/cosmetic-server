@@ -2,11 +2,14 @@ package com.example.backend.service;
 
 import com.example.backend.dto.CartAddRequest;
 import com.example.backend.dto.CartItemResponse;
+import com.example.backend.dto.ProductImageResponse;
 import com.example.backend.dto.ProductResponse;
 import com.example.backend.entity.CartItem;
 import com.example.backend.entity.Product;
+import com.example.backend.entity.ProductImage;
 import com.example.backend.entity.User;
 import com.example.backend.repository.CartItemRepository;
+import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,8 @@ public class CartService {
     private final CartItemRepository cartRepo;
     private final ProductRepository productRepo;
     private final UserService userService;
+    private final ProductImageRepository productImageRepo;
+
 
     public void add(CartAddRequest req) {
         User user = userService.getCurrentUser();
@@ -48,20 +53,30 @@ public class CartService {
 
         return cartRepo.findByUserId(user.getId())
                 .stream()
-                .map(c -> new CartItemResponse(
-                        c.getId(),
-                        new ProductResponse(
-                                c.getProduct().getId(),
-                                c.getProduct().getName(),
-                                c.getProduct().getBrand(),
-                                c.getProduct().getPrice(),
-                                c.getProduct().getDiscountPrice(),
-                                c.getProduct().getImageUrl(),
-                                c.getProduct().getCategory(),
-                                false
-                        ),
-                        c.getQuantity()
-                ))
+                .map(c -> {
+
+                    String imageUrl = productImageRepo
+                            .findByProductIdAndMainTrue(c.getProduct().getId())
+                            .map(ProductImage::getImageUrl)
+                            .orElse(null);
+
+                    return new CartItemResponse(
+                            c.getId(),
+                            new ProductResponse(
+                                    c.getProduct().getId(),
+                                    c.getProduct().getName(),
+                                    c.getProduct().getBrand(),
+                                    c.getProduct().getPrice(),
+                                    c.getProduct().getDiscountPrice(),
+                                    c.getProduct().getCategory(),
+                                    false,
+                                    List.of(
+                                            new ProductImageResponse(imageUrl, true)
+                                    )
+                            ),
+                            c.getQuantity()
+                    );
+                })
                 .toList();
     }
 

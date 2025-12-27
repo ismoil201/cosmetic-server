@@ -49,6 +49,12 @@ public class ProductService {
     }
 
 
+    @Transactional
+    public void delete(Long id) {
+        productImageRepo.deleteByProductId(id);
+        productRepo.deleteById(id);
+    }
+
     public Page<ProductResponse> getHomeProducts(Pageable pageable) {
 
         User user = userService.getCurrentUserOrNull();

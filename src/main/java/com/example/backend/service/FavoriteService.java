@@ -1,10 +1,13 @@
 package com.example.backend.service;
 
+import com.example.backend.dto.ProductImageResponse;
 import com.example.backend.dto.ProductResponse;
 import com.example.backend.entity.Favorite;
 import com.example.backend.entity.Product;
+import com.example.backend.entity.ProductImage;
 import com.example.backend.entity.User;
 import com.example.backend.repository.FavoriteRepository;
+import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,8 @@ public class FavoriteService {
     private final FavoriteRepository favRepo;
     private final ProductRepository productRepo;
     private final UserService userService;
+    private final ProductImageRepository productImageRepo;
+
 
     public boolean toggle(Long productId) {
         User user = userService.getCurrentUser();
@@ -46,15 +51,23 @@ public class FavoriteService {
                 .stream()
                 .map(f -> {
                     Product p = f.getProduct();
+
+                    String imageUrl = productImageRepo
+                            .findByProductIdAndMainTrue(p.getId())
+                            .map(ProductImage::getImageUrl)
+                            .orElse(null);
+
                     return new ProductResponse(
                             p.getId(),
                             p.getName(),
                             p.getBrand(),
                             p.getPrice(),
                             p.getDiscountPrice(),
-                            p.getImageUrl(),
                             p.getCategory(),
-                            true
+                            true,
+                            List.of(
+                                    new ProductImageResponse(imageUrl, true)
+                            )
                     );
                 })
                 .toList();
