@@ -4,6 +4,8 @@ import com.example.backend.entity.Category;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @AllArgsConstructor
 public class ProductDetailResponse {
@@ -15,10 +17,10 @@ public class ProductDetailResponse {
 
     private double price;
     private double discountPrice;
-
-    private String imageUrl;
     private Category category;
 
     private int stock;
     private boolean favorite;
+
+    private List<ProductImageResponse> images;
 }

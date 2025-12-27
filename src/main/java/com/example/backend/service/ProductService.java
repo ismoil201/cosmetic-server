@@ -2,16 +2,22 @@ package com.example.backend.service;
 
 import com.example.backend.dto.ProductCreateRequest;
 import com.example.backend.dto.ProductDetailResponse;
+import com.example.backend.dto.ProductImageResponse;
 import com.example.backend.dto.ProductResponse;
 import com.example.backend.entity.Category;
 import com.example.backend.entity.Product;
+import com.example.backend.entity.ProductImage;
 import com.example.backend.entity.User;
 import com.example.backend.repository.FavoriteRepository;
+import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -21,38 +27,62 @@ public class ProductService {
     private final FavoriteRepository favRepo;
     private final UserService userService;
 
+    private final ProductImageRepository productImageRepo;
+
+    @Transactional
+    public void create(ProductCreateRequest req) {
+
+        Product product = new Product();
+        map(req, product);
+        productRepo.save(product);
+
+        // 🔥 RASMLARNI SAQLASH
+        if (req.getImageUrls() != null && !req.getImageUrls().isEmpty()) {
+            for (int i = 0; i < req.getImageUrls().size(); i++) {
+                ProductImage img = new ProductImage();
+                img.setProduct(product);
+                img.setImageUrl(req.getImageUrls().get(i));
+                img.setMain(i == 0); // birinchi rasm — MAIN
+                productImageRepo.save(img);
+            }
+        }
+    }
+
+
     public Page<ProductResponse> getHomeProducts(Pageable pageable) {
 
         User user = userService.getCurrentUserOrNull();
-
         Page<Product> page = productRepo.findByActiveTrue(pageable);
 
-        // 🔓 TOKEN YO‘Q → favorite = false
-        if (user == null) {
-            return page.map(p -> new ProductResponse(
+        return page.map(p -> {
+
+            boolean favorite = false;
+            if (user != null) {
+                favorite = favRepo.existsByUserAndProduct(user, p);
+            }
+
+            List<ProductImageResponse> images =
+                    productImageRepo.findByProductId(p.getId())
+                            .stream()
+                            .map(img -> new ProductImageResponse(
+                                    img.getImageUrl(),
+                                    img.isMain()
+                            ))
+                            .toList();
+
+            return new ProductResponse(
                     p.getId(),
                     p.getName(),
                     p.getBrand(),
                     p.getPrice(),
                     p.getDiscountPrice(),
-                    p.getImageUrl(),
                     p.getCategory(),
-                    false
-            ));
-        }
-
-        // 🔐 TOKEN BOR
-        return page.map(p -> new ProductResponse(
-                p.getId(),
-                p.getName(),
-                p.getBrand(),
-                p.getPrice(),
-                p.getDiscountPrice(),
-                p.getImageUrl(),
-                p.getCategory(),
-                favRepo.existsByUserAndProduct(user, p)
-        ));
+                    favorite,
+                    images
+            );
+        });
     }
+
 
 
     public ProductDetailResponse getDetail(Long productId) {
@@ -62,13 +92,22 @@ public class ProductService {
         Product p = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        p.setViewCount(p.getViewCount() + 3);
+        p.setViewCount(p.getViewCount() + 1);
         productRepo.save(p);
 
         boolean favorite = false;
         if (user != null) {
             favorite = favRepo.existsByUserAndProduct(user, p);
         }
+
+        List<ProductImageResponse> images =
+                productImageRepo.findByProductId(p.getId())
+                        .stream()
+                        .map(img -> new ProductImageResponse(
+                                img.getImageUrl(),
+                                img.isMain()
+                        ))
+                        .toList();
 
         return new ProductDetailResponse(
                 p.getId(),
@@ -77,31 +116,40 @@ public class ProductService {
                 p.getBrand(),
                 p.getPrice(),
                 p.getDiscountPrice(),
-                p.getImageUrl(),
                 p.getCategory(),
                 p.getStock(),
-                favorite
+                favorite,
+                images
         );
     }
 
-    public void create(ProductCreateRequest req) {
-        Product p = new Product();
-        map(req, p);
-        productRepo.save(p);
-    }
 
-    // ✅ YO‘Q EDI
+
+
+    @Transactional
     public void update(Long id, ProductCreateRequest req) {
-        Product p = productRepo.findById(id)
+
+        Product product = productRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
-        map(req, p);
-        productRepo.save(p);
+
+        map(req, product);
+        productRepo.save(product);
+
+        // ❗ eski rasmlarni o‘chiramiz
+        productImageRepo.deleteByProductId(product.getId());
+
+        // 🔥 yangi rasmlar
+        if (req.getImageUrls() != null) {
+            for (int i = 0; i < req.getImageUrls().size(); i++) {
+                ProductImage img = new ProductImage();
+                img.setProduct(product);
+                img.setImageUrl(req.getImageUrls().get(i));
+                img.setMain(i == 0);
+                productImageRepo.save(img);
+            }
+        }
     }
 
-    // ✅ YO‘Q EDI
-    public void delete(Long id) {
-        productRepo.deleteById(id);
-    }
 
     private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());
@@ -109,7 +157,10 @@ public class ProductService {
         p.setBrand(req.getBrand());
         p.setPrice(req.getPrice());
         p.setDiscountPrice(req.getDiscountPrice());
-        p.setImageUrl(req.getImageUrl());
+
+        // ❌ BU QATORNI O‘CHIR
+        // p.setImageUrl(req.getImageUrl());
+
         try {
             p.setCategory(Category.valueOf(req.getCategory().toUpperCase()));
         } catch (Exception e) {
@@ -118,5 +169,6 @@ public class ProductService {
 
         p.setStock(req.getStock());
     }
+
 
 }

@@ -27,8 +27,6 @@ public class Product {
     @Column(name = "discount_price")
     private double discountPrice;
 
-    @Column(name = "image_url")
-    private String imageUrl;
 
     private String brand;
 
