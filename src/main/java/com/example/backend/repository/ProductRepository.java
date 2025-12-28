@@ -25,7 +25,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 🔥 MUHIM: todayDeal bilan ishlaydigan QUERY
     @Modifying
     @Transactional
-    @Query("update Product p set p.todayDeal = false where p.todayDeal = true")
+    @Query("update Products p set p.is_today_deal = false where p.is_today_deal = true")
     void clearTodayDeals();
 
     List<Product> findByTodayDealTrueAndActiveTrue();
