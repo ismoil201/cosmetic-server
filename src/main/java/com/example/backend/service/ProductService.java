@@ -140,7 +140,7 @@ public class ProductService {
 
         User user = userService.getCurrentUserOrNull();
 
-        return productRepo.findByTodayDealTrueAndActiveTrue()
+        return productRepo.findByIsTodayDealTrueAndActiveTrue()
                 .stream()
                 .map(p -> {
 

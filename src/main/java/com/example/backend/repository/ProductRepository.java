@@ -28,7 +28,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("update Product p set p.isTodayDeal = false where p.isTodayDeal = true")
     void clearTodayDeals();
 
-    List<Product> findByTodayDealTrueAndActiveTrue();
+    List<Product> findByIsTodayDealTrueAndActiveTrue();
+
 
 
     // 🔎 CATEGORY
