@@ -87,14 +87,17 @@ public class AdminProductService {
     @Transactional
     public void setSingleTodayDeal(Long productId) {
 
+        // 🔥 Avval eski today deal’larni o‘chir
         productRepo.clearTodayDeals();
 
-        Product p = productRepo.findById(productId)
+        // 🔥 Yangi today deal
+        Product product = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        p.setTodayDeal(true);
-        productRepo.save(p);
+        product.setTodayDeal(true);
+        productRepo.save(product);
     }
+
 
     // ================= HELPERS =================
     private void saveImages(Product product, ProductCreateRequest req) {
