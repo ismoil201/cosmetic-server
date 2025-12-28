@@ -16,10 +16,11 @@ public class OrderService {
     private final OrderRepository orderRepo;
     private final OrderItemRepository orderItemRepo;
     private final CartItemRepository cartRepo;
-    private final UserService userService;
-    private final ProductImageRepository productImageRepo;
     private final ProductRepository productRepo;
+    private final ProductImageRepository productImageRepo;
+    private final UserService userService;
 
+    /* ================= CREATE ORDER (CART → ORDER) ================= */
 
     @Transactional
     public OrderResponse create(OrderCreateRequest req) {
@@ -31,52 +32,71 @@ public class OrderService {
             throw new RuntimeException("Cart is empty");
         }
 
+        // 🔒 1. STOCKNI AVVAL TEKSHIRIB OLAMIZ
+        for (CartItem c : cartItems) {
+            Product p = c.getProduct();
+
+            if (!p.isActive()) {
+                throw new RuntimeException("Product is not active: " + p.getName());
+            }
+
+            if (c.getQuantity() > p.getStock()) {
+                throw new RuntimeException(
+                        "Not enough stock for product: " + p.getName()
+                );
+            }
+        }
+
+        // 🔒 2. ORDER CREATE
         Order order = new Order();
         order.setUser(user);
         order.setAddress(req.getAddress());
         order.setPhone(req.getPhone());
         order.setStatus(OrderStatus.PENDING);
+        order.setTotalAmount(0);
 
         order = orderRepo.save(order);
 
         double total = 0;
 
+        // 🔥 3. ORDER ITEMS + STOCK KAMAYTIRISH
         for (CartItem c : cartItems) {
 
             Product product = c.getProduct();
 
-            // 🔥 SOLD COUNT OSHIRISH
-            product.setSoldCount(
-                    product.getSoldCount() + c.getQuantity()
-            );
-            productRepo.save(product); // 🔴 MUHIM
-
-            OrderItem item = new OrderItem();
-            item.setOrder(order);
-            item.setProduct(product);
-            item.setQuantity(c.getQuantity());
+            // 🔥 STOCK KAMAYADI
+            product.setStock(product.getStock() - c.getQuantity());
+            productRepo.save(product);
 
             double price = product.getDiscountPrice() > 0
                     ? product.getDiscountPrice()
                     : product.getPrice();
 
-            item.setPrice(price);
-            total += price * c.getQuantity();
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setProduct(product);
+            item.setQuantity(c.getQuantity());
+            item.setPrice(price); // snapshot
 
             orderItemRepo.save(item);
+
+            total += price * c.getQuantity();
         }
 
         order.setTotalAmount(total);
         orderRepo.save(order);
 
-        // 🧹 CART TOZALASH
+        // 🧹 4. CART TOZALANADI
         cartRepo.deleteByUserId(user.getId());
 
+        // ✅ Hammasi muvaffaqiyatli → commit
         return detail(order.getId());
     }
 
+    /* ================= MY ORDERS ================= */
 
     public List<OrderResponse> myOrders() {
+
         User user = userService.getCurrentUser();
 
         return orderRepo.findByUserId(user.getId())
@@ -84,6 +104,8 @@ public class OrderService {
                 .map(o -> detail(o.getId()))
                 .toList();
     }
+
+    /* ================= ORDER DETAIL ================= */
 
     public OrderResponse detail(Long orderId) {
 
@@ -96,24 +118,25 @@ public class OrderService {
                 )
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        List<OrderItemResponse> items = orderItemRepo.findByOrderId(order.getId())
-                .stream()
-                .map(i -> {
+        List<OrderItemResponse> items =
+                orderItemRepo.findByOrderId(order.getId())
+                        .stream()
+                        .map(i -> {
 
-                    String imageUrl = productImageRepo
-                            .findByProductIdAndMainTrue(i.getProduct().getId())
-                            .map(ProductImage::getImageUrl)
-                            .orElse(null);
+                            String imageUrl = productImageRepo
+                                    .findByProductIdAndMainTrue(i.getProduct().getId())
+                                    .map(ProductImage::getImageUrl)
+                                    .orElse(null);
 
-                    return new OrderItemResponse(
-                            i.getProduct().getId(),
-                            i.getProduct().getName(),
-                            imageUrl,
-                            i.getPrice(),
-                            i.getQuantity()
-                    );
-                })
-                .toList(); // 🔥 MUHIM
+                            return new OrderItemResponse(
+                                    i.getProduct().getId(),
+                                    i.getProduct().getName(),
+                                    imageUrl,
+                                    i.getPrice(),
+                                    i.getQuantity()
+                            );
+                        })
+                        .toList();
 
         return new OrderResponse(
                 order.getId(),
@@ -124,8 +147,8 @@ public class OrderService {
         );
     }
 
+    /* ================= ADMIN: ALL ORDERS ================= */
 
-    // ADMIN
     public List<OrderResponse> allOrders() {
         return orderRepo.findAll()
                 .stream()
@@ -133,7 +156,8 @@ public class OrderService {
                 .toList();
     }
 
-    // ADMIN
+    /* ================= ADMIN: UPDATE STATUS ================= */
+
     @Transactional
     public void updateStatus(Long orderId, String status) {
 
@@ -142,10 +166,12 @@ public class OrderService {
 
         OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
 
-        // 🔥 FAFAQAT BIR MARTA SOLD COUNT OSHADI
-        if (order.getStatus() != OrderStatus.PAID && newStatus == OrderStatus.PAID) {
+        // 🔥 SOLD COUNT FAQAT PAID GA O‘TGANDA
+        if (order.getStatus() != OrderStatus.PAID
+                && newStatus == OrderStatus.PAID) {
 
-            List<OrderItem> items = orderItemRepo.findByOrder(order);
+            List<OrderItem> items =
+                    orderItemRepo.findByOrder(order);
 
             for (OrderItem item : items) {
                 Product product = item.getProduct();
@@ -156,8 +182,23 @@ public class OrderService {
             }
         }
 
+        // 🔄 AGAR CANCEL BO‘LSA → STOCK QAYTADI
+        if (order.getStatus() != OrderStatus.CANCELED
+                && newStatus == OrderStatus.CANCELED) {
+
+            List<OrderItem> items =
+                    orderItemRepo.findByOrder(order);
+
+            for (OrderItem item : items) {
+                Product product = item.getProduct();
+                product.setStock(
+                        product.getStock() + item.getQuantity()
+                );
+                productRepo.save(product);
+            }
+        }
+
         order.setStatus(newStatus);
         orderRepo.save(order);
     }
-
 }
