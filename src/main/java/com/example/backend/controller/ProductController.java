@@ -58,4 +58,10 @@ public class ProductController {
         productService.delete(id);
         return ResponseEntity.ok("Deleted");
     }
+
+    @GetMapping("/today-deals")
+    public List<ProductResponse> todayDeals() {
+        return productService.getTodayDeals();
+    }
+
 }

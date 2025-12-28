@@ -66,6 +66,8 @@ public class FavoriteService {
                             p.getCategory(),
                             p.getRatingAvg(),     // 🔥
                             p.getReviewCount(),   // 🔥
+                            p.getSoldCount(),        // 🔥
+                            p.isTodayDeal(),         // 🔥
                             true,
                             List.of(
                                     new ProductImageResponse(imageUrl, true)

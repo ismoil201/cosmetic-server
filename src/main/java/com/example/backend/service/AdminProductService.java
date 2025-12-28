@@ -20,9 +20,7 @@ public class AdminProductService {
     private final ProductRepository productRepo;
     private final ProductImageRepository productImageRepo;
 
-    // =========================
-    // ✅ ADMIN PRODUCT LIST
-    // =========================
+    // ================= ADMIN LIST =================
     public Page<AdminProductResponse> list(Boolean active, Pageable pageable) {
 
         Page<Product> page = (active == null)
@@ -39,37 +37,22 @@ public class AdminProductService {
                 p.isActive(),
                 p.getCategory(),
                 p.isTodayDeal(),
-                p.getSoldCount(),
-                p.getCreatedAt()
+                p.getSoldCount()
         ));
     }
 
-    // =========================
-    // ✅ ADMIN CREATE PRODUCT
-    // =========================
+    // ================= CREATE =================
     @Transactional
     public void create(ProductCreateRequest req) {
 
         Product product = new Product();
         map(req, product);
-
         productRepo.save(product);
 
-        // 🔥 RASMLARNI SAQLASH
-        if (req.getImageUrls() != null && !req.getImageUrls().isEmpty()) {
-            for (int i = 0; i < req.getImageUrls().size(); i++) {
-                ProductImage img = new ProductImage();
-                img.setProduct(product);
-                img.setImageUrl(req.getImageUrls().get(i));
-                img.setMain(i == 0); // 1-rasm MAIN
-                productImageRepo.save(img);
-            }
-        }
+        saveImages(product, req);
     }
 
-    // =========================
-    // ✅ ADMIN UPDATE PRODUCT
-    // =========================
+    // ================= UPDATE =================
     @Transactional
     public void update(Long id, ProductCreateRequest req) {
 
@@ -79,24 +62,11 @@ public class AdminProductService {
         map(req, product);
         productRepo.save(product);
 
-        // ❌ ESKI RASMLARNI O‘CHIRAMIZ
         productImageRepo.deleteByProductId(product.getId());
-
-        // ✅ YANGI RASMLAR
-        if (req.getImageUrls() != null && !req.getImageUrls().isEmpty()) {
-            for (int i = 0; i < req.getImageUrls().size(); i++) {
-                ProductImage img = new ProductImage();
-                img.setProduct(product);
-                img.setImageUrl(req.getImageUrls().get(i));
-                img.setMain(i == 0);
-                productImageRepo.save(img);
-            }
-        }
+        saveImages(product, req);
     }
 
-    // =========================
-    // ✅ ADMIN SOFT DELETE
-    // =========================
+    // ================= SOFT DELETE =================
     public void softDelete(Long id) {
         Product p = productRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -104,9 +74,7 @@ public class AdminProductService {
         productRepo.save(p);
     }
 
-    // =========================
-    // ✅ ADMIN RESTORE
-    // =========================
+    // ================= RESTORE =================
     public void restore(Long id) {
         Product p = productRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -114,29 +82,12 @@ public class AdminProductService {
         productRepo.save(p);
     }
 
-    // =========================
-    // 🔥 ADMIN – TODAY DEAL
-    // =========================
-    @Transactional
-    public void setTodayDeal(Long productId, boolean value) {
-
-        Product p = productRepo.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
-
-        p.setTodayDeal(value);
-        productRepo.save(p);
-    }
-
-    // =========================
-    // 🔥 FAQAT BITTA TODAY DEAL (OPTIONAL)
-    // =========================
+    // ================= TODAY DEAL (BITTA) =================
     @Transactional
     public void setSingleTodayDeal(Long productId) {
 
-        // Avval hammasini o‘chiramiz
         productRepo.clearTodayDeals();
 
-        // Bitta product’ni yoqamiz
         Product p = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
@@ -144,11 +95,20 @@ public class AdminProductService {
         productRepo.save(p);
     }
 
-    // =========================
-    // 🔧 MAP REQUEST → ENTITY
-    // =========================
-    private void map(ProductCreateRequest req, Product p) {
+    // ================= HELPERS =================
+    private void saveImages(Product product, ProductCreateRequest req) {
+        if (req.getImageUrls() == null) return;
 
+        for (int i = 0; i < req.getImageUrls().size(); i++) {
+            ProductImage img = new ProductImage();
+            img.setProduct(product);
+            img.setImageUrl(req.getImageUrls().get(i));
+            img.setMain(i == 0);
+            productImageRepo.save(img);
+        }
+    }
+
+    private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());
         p.setDescription(req.getDescription());
         p.setBrand(req.getBrand());
@@ -156,10 +116,6 @@ public class AdminProductService {
         p.setDiscountPrice(req.getDiscountPrice());
         p.setStock(req.getStock());
 
-        try {
-            p.setCategory(Category.valueOf(req.getCategory().toUpperCase()));
-        } catch (Exception e) {
-            throw new RuntimeException("Invalid category");
-        }
+        p.setCategory(Category.valueOf(req.getCategory().toUpperCase()));
     }
 }

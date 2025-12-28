@@ -15,5 +15,8 @@ public class AdminProductResponse {
     private int stock;
     private boolean active;
     private Category category;
-    private boolean todayDeal;
+    private boolean isTodayDeal;
+    private int soldCount;
+    // 🔥
+
 }

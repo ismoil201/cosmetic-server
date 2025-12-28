@@ -18,10 +18,6 @@ public class AdminProductController {
 
     private final AdminProductService adminProductService;
 
-    // ✅ LIST (active filter optional)
-    // /api/admin/products
-    // /api/admin/products?active=true
-    // /api/admin/products?active=false
     @GetMapping
     public Page<AdminProductResponse> list(
             @RequestParam(required = false) Boolean active,
@@ -30,41 +26,37 @@ public class AdminProductController {
         return adminProductService.list(active, pageable);
     }
 
-    // ✅ CREATE
     @PostMapping
     public ResponseEntity<?> create(@RequestBody ProductCreateRequest req) {
         adminProductService.create(req);
         return ResponseEntity.ok("Created");
     }
 
-    // ✅ UPDATE
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id,
-                                    @RequestBody ProductCreateRequest req) {
+    public ResponseEntity<?> update(
+            @PathVariable Long id,
+            @RequestBody ProductCreateRequest req
+    ) {
         adminProductService.update(id, req);
         return ResponseEntity.ok("Updated");
     }
 
-    // ✅ SOFT DELETE (active=false)
     @DeleteMapping("/{id}")
     public ResponseEntity<?> softDelete(@PathVariable Long id) {
         adminProductService.softDelete(id);
         return ResponseEntity.ok("Deactivated");
     }
 
-    // ✅ RESTORE (active=true)
     @PutMapping("/{id}/restore")
     public ResponseEntity<?> restore(@PathVariable Long id) {
         adminProductService.restore(id);
         return ResponseEntity.ok("Restored");
     }
-    @PutMapping("/products/{id}/today-deal")
-    public String setTodayDeal(
-            @PathVariable Long id,
-            @RequestParam boolean value
-    ) {
-        adminProductService.setTodayDeal(id, value);
-        return "Updated";
-    }
 
+    // 🔥 TODAY DEAL (BITTA)
+    @PutMapping("/{id}/today-deal")
+    public ResponseEntity<?> setTodayDeal(@PathVariable Long id) {
+        adminProductService.setSingleTodayDeal(id);
+        return ResponseEntity.ok("Today deal updated");
+    }
 }

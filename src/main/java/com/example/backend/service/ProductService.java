@@ -135,6 +135,48 @@ public class ProductService {
 
     }
 
+    // TODAY DEAL BANNER
+    public List<ProductResponse> getTodayDeals() {
+
+        User user = userService.getCurrentUserOrNull();
+
+        return productRepo.findByTodayDealTrueAndActiveTrue()
+                .stream()
+                .map(p -> {
+
+                    boolean favorite = false;
+                    if (user != null) {
+                        favorite = favRepo.existsByUserAndProduct(user, p);
+                    }
+
+                    List<ProductImageResponse> images =
+                            productImageRepo.findByProductId(p.getId())
+                                    .stream()
+                                    .map(img -> new ProductImageResponse(
+                                            img.getImageUrl(),
+                                            img.isMain()
+                                    ))
+                                    .toList();
+
+                    return new ProductResponse(
+                            p.getId(),
+                            p.getName(),
+                            p.getBrand(),
+                            p.getPrice(),
+                            p.getDiscountPrice(),
+                            p.getCategory(),
+                            p.getRatingAvg(),
+                            p.getReviewCount(),
+                            p.getSoldCount(),
+                            p.isTodayDeal(),
+                            favorite,
+                            images
+                    );
+                })
+                .toList();
+    }
+
+
     /* ================= UPDATE ================= */
 
     @Transactional

@@ -73,6 +73,8 @@ public class CartService {
                                     c.getProduct().getCategory(),
                                     c.getProduct().getRatingAvg(),     // 🔥 QO‘SHILDI
                                     c.getProduct().getReviewCount(),   // 🔥 QO‘SHILDI
+                                    c.getProduct().getSoldCount(),      // 🔥
+                                    c.getProduct().isTodayDeal(),       // 🔥
                                     false,
                                     List.of(
                                             new ProductImageResponse(imageUrl, true)

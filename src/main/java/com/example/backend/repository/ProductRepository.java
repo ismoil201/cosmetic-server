@@ -10,6 +10,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
+
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
@@ -22,6 +24,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Modifying
     @Query("update Product p set p.todayDeal = false where p.todayDeal = true")
     void clearTodayDeals();
+
+    List<Product> findByTodayDealTrueAndActiveTrue();
+
 
     // 🔎 CATEGORY
     Page<Product> findByCategoryAndActiveTrue(Category category, Pageable pageable);

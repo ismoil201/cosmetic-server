@@ -134,10 +134,30 @@ public class OrderService {
     }
 
     // ADMIN
+    @Transactional
     public void updateStatus(Long orderId, String status) {
+
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
-        order.setStatus(OrderStatus.valueOf(status.toUpperCase()));
+
+        OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
+
+        // 🔥 FAFAQAT BIR MARTA SOLD COUNT OSHADI
+        if (order.getStatus() != OrderStatus.PAID && newStatus == OrderStatus.PAID) {
+
+            List<OrderItem> items = orderItemRepo.findByOrder(order);
+
+            for (OrderItem item : items) {
+                Product product = item.getProduct();
+                product.setSoldCount(
+                        product.getSoldCount() + item.getQuantity()
+                );
+                productRepo.save(product);
+            }
+        }
+
+        order.setStatus(newStatus);
         orderRepo.save(order);
     }
+
 }
