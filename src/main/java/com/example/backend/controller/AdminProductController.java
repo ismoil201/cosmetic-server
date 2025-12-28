@@ -58,4 +58,13 @@ public class AdminProductController {
         adminProductService.restore(id);
         return ResponseEntity.ok("Restored");
     }
+    @PutMapping("/products/{id}/today-deal")
+    public String setTodayDeal(
+            @PathVariable Long id,
+            @RequestParam boolean value
+    ) {
+        adminProductService.setTodayDeal(id, value);
+        return "Updated";
+    }
+
 }

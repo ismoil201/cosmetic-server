@@ -18,8 +18,9 @@ public class ProductResponse {
     private Category category;
     private double ratingAvg;
     private int reviewCount;
+    private int soldCount;
+    private boolean isTodayDeal;
     private boolean favorite;
-
 
     private List<ProductImageResponse> images;
 }

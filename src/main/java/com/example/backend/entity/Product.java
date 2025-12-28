@@ -48,6 +48,12 @@ public class Product {
     @Column(name = "review_count")
     private int reviewCount = 0;
 
+    @Column(name = "sold_count")
+    private int soldCount = 0;
+
+    @Column(name = "is_today_deal")
+    private boolean isTodayDeal = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

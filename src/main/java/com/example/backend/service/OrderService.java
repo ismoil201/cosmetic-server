@@ -2,10 +2,7 @@ package com.example.backend.service;
 
 import com.example.backend.dto.*;
 import com.example.backend.entity.*;
-import com.example.backend.repository.CartItemRepository;
-import com.example.backend.repository.OrderItemRepository;
-import com.example.backend.repository.OrderRepository;
-import com.example.backend.repository.ProductImageRepository;
+import com.example.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,10 +18,12 @@ public class OrderService {
     private final CartItemRepository cartRepo;
     private final UserService userService;
     private final ProductImageRepository productImageRepo;
+    private final ProductRepository productRepo;
 
 
     @Transactional
     public OrderResponse create(OrderCreateRequest req) {
+
         User user = userService.getCurrentUser();
         List<CartItem> cartItems = cartRepo.findByUserId(user.getId());
 
@@ -43,17 +42,26 @@ public class OrderService {
         double total = 0;
 
         for (CartItem c : cartItems) {
+
+            Product product = c.getProduct();
+
+            // 🔥 SOLD COUNT OSHIRISH
+            product.setSoldCount(
+                    product.getSoldCount() + c.getQuantity()
+            );
+            productRepo.save(product); // 🔴 MUHIM
+
             OrderItem item = new OrderItem();
             item.setOrder(order);
-            item.setProduct(c.getProduct());
+            item.setProduct(product);
             item.setQuantity(c.getQuantity());
 
-            double price = c.getProduct().getDiscountPrice() > 0
-                    ? c.getProduct().getDiscountPrice()
-                    : c.getProduct().getPrice();
+            double price = product.getDiscountPrice() > 0
+                    ? product.getDiscountPrice()
+                    : product.getPrice();
 
             item.setPrice(price);
-            total += price * item.getQuantity();
+            total += price * c.getQuantity();
 
             orderItemRepo.save(item);
         }
@@ -61,10 +69,12 @@ public class OrderService {
         order.setTotalAmount(total);
         orderRepo.save(order);
 
+        // 🧹 CART TOZALASH
         cartRepo.deleteByUserId(user.getId());
 
         return detail(order.getId());
     }
+
 
     public List<OrderResponse> myOrders() {
         User user = userService.getCurrentUser();
