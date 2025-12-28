@@ -56,7 +56,7 @@ public class CartService {
         return cartRepo.findByUserId(user.getId())
                 .stream()
                 .map(c -> {
-
+                    Product p = c.getProduct();
                     String imageUrl = productImageRepo
                             .findByProductIdAndMainTrue(c.getProduct().getId())
                             .map(ProductImage::getImageUrl)
@@ -65,21 +65,20 @@ public class CartService {
                     return new CartItemResponse(
                             c.getId(),
                             new ProductResponse(
-                                    c.getProduct().getId(),
-                                    c.getProduct().getName(),
-                                    c.getProduct().getBrand(),
-                                    c.getProduct().getPrice(),
-                                    c.getProduct().getDiscountPrice(),
-                                    c.getProduct().getCategory(),
-                                    c.getProduct().getRatingAvg(),     // 🔥 QO‘SHILDI
-                                    c.getProduct().getReviewCount(),   // 🔥 QO‘SHILDI
-                                    c.getProduct().getSoldCount(),      // 🔥
-                                    c.getProduct().isTodayDeal(),       // 🔥
-                                    false,
-                                    List.of(
-                                            new ProductImageResponse(imageUrl, true)
-                                    )
+                                    p.getId(),
+                                    p.getName(),
+                                    p.getBrand(),
+                                    p.getPrice(),
+                                    p.getDiscountPrice(),
+                                    p.getCategory(),
+                                    p.getRatingAvg(),
+                                    p.getReviewCount(),
+                                    p.getSoldCount(),
+                                    p.isTodayDeal(),
+                                    false, // favorite
+                                    List.of(new ProductImageResponse(imageUrl, true))
                             )
+
                             ,
                             c.getQuantity()
                     );

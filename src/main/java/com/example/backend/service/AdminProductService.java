@@ -27,7 +27,7 @@ public class AdminProductService {
                 ? productRepo.findAll(pageable)
                 : productRepo.findByActive(active, pageable);
 
-        return page.map(p -> new AdminProductResponse(
+         return page.map(p -> new AdminProductResponse(
                 p.getId(),
                 p.getName(),
                 p.getBrand(),
@@ -39,6 +39,7 @@ public class AdminProductService {
                 p.isTodayDeal(),
                 p.getSoldCount()
         ));
+
     }
 
     // ================= CREATE =================

@@ -64,14 +64,12 @@ public class FavoriteService {
                             p.getPrice(),
                             p.getDiscountPrice(),
                             p.getCategory(),
-                            p.getRatingAvg(),     // 🔥
-                            p.getReviewCount(),   // 🔥
-                            p.getSoldCount(),        // 🔥
-                            p.isTodayDeal(),         // 🔥
+                            p.getRatingAvg(),
+                            p.getReviewCount(),
+                            p.getSoldCount(),
+                            p.isTodayDeal(),
                             true,
-                            List.of(
-                                    new ProductImageResponse(imageUrl, true)
-                            )
+                            List.of(new ProductImageResponse(imageUrl, true))
                     );
 
                 })
