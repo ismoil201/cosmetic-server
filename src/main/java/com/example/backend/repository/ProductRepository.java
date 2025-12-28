@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -21,7 +22,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 🏠 HOME
     Page<Product> findByActiveTrue(Pageable pageable);
 
+    // 🔥 MUHIM: todayDeal bilan ishlaydigan QUERY
     @Modifying
+    @Transactional
     @Query("update Product p set p.todayDeal = false where p.todayDeal = true")
     void clearTodayDeals();
 
