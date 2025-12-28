@@ -1,8 +1,6 @@
 package com.example.backend.dto;
 
-import com.example.backend.entity.Category;
 import lombok.Data;
-
 import java.util.List;
 
 @Data
@@ -16,6 +14,9 @@ public class ProductCreateRequest {
     private String category;
     private int stock;
 
-    // 🔥 Firebase’dan kelgan URL’lar
+    // 🔥 MAIN / SLIDER IMAGES
     private List<String> imageUrls;
+
+    // 🔥 DETAIL PAGE IMAGES (Musinsa style)
+    private List<ProductDetailImageRequest> detailImages;
 }

@@ -2,6 +2,7 @@ package com.example.backend.controller;
 
 import com.example.backend.dto.CartAddRequest;
 import com.example.backend.dto.CartItemResponse;
+import com.example.backend.dto.CartUpdateRequest;
 import com.example.backend.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,11 +32,12 @@ public class CartController {
     @PutMapping("/{cartItemId}")
     public String updateQty(
             @PathVariable Long cartItemId,
-            @RequestParam int quantity
+            @RequestBody CartUpdateRequest req
     ) {
-        cartService.updateQuantity(cartItemId, quantity);
+        cartService.updateQuantity(cartItemId, req.getQuantity());
         return "Updated";
     }
+
 
     @DeleteMapping("/{cartItemId}")
     public String delete(@PathVariable Long cartItemId) {

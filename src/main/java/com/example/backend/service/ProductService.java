@@ -1,14 +1,12 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.ProductCreateRequest;
-import com.example.backend.dto.ProductDetailResponse;
-import com.example.backend.dto.ProductImageResponse;
-import com.example.backend.dto.ProductResponse;
+import com.example.backend.dto.*;
 import com.example.backend.entity.Category;
 import com.example.backend.entity.Product;
 import com.example.backend.entity.ProductImage;
 import com.example.backend.entity.User;
 import com.example.backend.repository.FavoriteRepository;
+import com.example.backend.repository.ProductDetailImageRepository;
 import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +24,8 @@ public class ProductService {
     private final FavoriteRepository favRepo;
     private final UserService userService;
     private final ProductImageRepository productImageRepo;
+    private final ProductDetailImageRepository detailImageRepo;
+
 
     /* ================= CREATE ================= */
 
@@ -115,6 +115,15 @@ public class ProductService {
                         ))
                         .toList();
 
+        List<ProductDetailImageResponse> detailImages =
+                detailImageRepo.findByProductIdOrderBySortOrderAsc(p.getId())
+                        .stream()
+                        .map(img -> new ProductDetailImageResponse(
+                                img.getImageUrl(),
+                                img.getSortOrder()
+                        ))
+                        .toList();
+
         return new ProductDetailResponse(
                 p.getId(),
                 p.getName(),
@@ -129,7 +138,8 @@ public class ProductService {
                 p.getSoldCount(),      // 🔥
                 p.isTodayDeal(),       // 🔥
                 favorite,
-                images
+                images,
+                detailImages
         );
 
 

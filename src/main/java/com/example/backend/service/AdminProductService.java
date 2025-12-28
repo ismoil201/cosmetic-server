@@ -2,9 +2,12 @@ package com.example.backend.service;
 
 import com.example.backend.dto.AdminProductResponse;
 import com.example.backend.dto.ProductCreateRequest;
+import com.example.backend.dto.ProductDetailImageRequest;
 import com.example.backend.entity.Category;
 import com.example.backend.entity.Product;
+import com.example.backend.entity.ProductDetailImage;
 import com.example.backend.entity.ProductImage;
+import com.example.backend.repository.ProductDetailImageRepository;
 import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +22,8 @@ public class AdminProductService {
 
     private final ProductRepository productRepo;
     private final ProductImageRepository productImageRepo;
+    private final ProductDetailImageRepository detailImageRepo;
+
 
     // ================= ADMIN LIST =================
     public Page<AdminProductResponse> list(Boolean active, Pageable pageable) {
@@ -51,6 +56,8 @@ public class AdminProductService {
         productRepo.save(product);
 
         saveImages(product, req);
+        saveDetailImages(product, req); // 🔥 YANGI
+
     }
 
     // ================= UPDATE =================
@@ -64,7 +71,11 @@ public class AdminProductService {
         productRepo.save(product);
 
         productImageRepo.deleteByProductId(product.getId());
+        detailImageRepo.deleteByProductId(product.getId()); // 🔥
+
         saveImages(product, req);
+        saveDetailImages(product, req); // 🔥
+
     }
 
     // ================= SOFT DELETE =================
@@ -111,6 +122,21 @@ public class AdminProductService {
             productImageRepo.save(img);
         }
     }
+    private void saveDetailImages(Product product, ProductCreateRequest req) {
+
+        if (req.getDetailImages() == null) return;
+
+        for (ProductDetailImageRequest d : req.getDetailImages()) {
+
+            ProductDetailImage img = new ProductDetailImage();
+            img.setProduct(product);
+            img.setImageUrl(d.getImageUrl());
+            img.setSortOrder(d.getSortOrder());
+
+            detailImageRepo.save(img);
+        }
+    }
+
 
     private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());
