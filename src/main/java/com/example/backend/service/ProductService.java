@@ -82,6 +82,7 @@ public class ProductService {
                     product.getSoldCount(),      // 🔥
                     product.isTodayDeal(),       // 🔥
                     favorite,
+                    product.getStock(),
                     images
             );
 
@@ -180,6 +181,7 @@ public class ProductService {
                             p.getSoldCount(),
                             p.isTodayDeal(),
                             favorite,
+                            p.getStock(),
                             images
                     );
                 })

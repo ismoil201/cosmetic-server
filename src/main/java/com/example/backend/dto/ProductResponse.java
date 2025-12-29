@@ -22,5 +22,7 @@ public class ProductResponse {
     private boolean isTodayDeal;
     private boolean favorite;
 
+    private int stock;              // 🔥 QO‘SHILDI
+
     private List<ProductImageResponse> images;
 }
