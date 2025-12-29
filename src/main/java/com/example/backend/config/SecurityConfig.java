@@ -34,6 +34,8 @@ public class SecurityConfig {
 
                         // 🔓 PUBLIC PRODUCTS (🔥 METHOD YO‘Q!)
                         .requestMatchers("/api/products/**").permitAll()
+                        .requestMatchers("/api/reviews/product/**").permitAll() // 🔥 MUHIM
+
 
                         // 🔓 ERROR (MUHIM!)
                         .requestMatchers("/error").permitAll()
