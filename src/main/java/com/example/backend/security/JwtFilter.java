@@ -16,6 +16,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+import static io.jsonwebtoken.Jwts.claims;
+
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
@@ -31,14 +33,17 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // 🔓 PUBLIC ENDPOINTLAR — TOKEN UMUMAN TEKSHIRILMAYDI
         if (
-                path.startsWith("/api/auth") ||
-                        path.startsWith("/api/products")
+                path.equals("/api/products") ||
+                        path.matches("/api/products/\\d+") ||
+                        path.equals("/api/products/today-deals") ||
+                        path.matches("/api/reviews/product/\\d+") ||
+                        path.startsWith("/api/auth")
         ) {
             filterChain.doFilter(request, response);
             return;
         }
+
 
         String authHeader = request.getHeader("Authorization");
 
@@ -81,4 +86,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
         filterChain.doFilter(request, response);
     }
+
+
+
 }
