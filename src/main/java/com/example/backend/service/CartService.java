@@ -107,6 +107,7 @@ public class CartService {
                                     p.getSoldCount(),
                                     p.isTodayDeal(),
                                     false, // favorite (cartda shart emas)
+                                    p.getStock(),
                                     List.of(new ProductImageResponse(imageUrl, true))
                             ),
                             c.getQuantity()

@@ -54,6 +54,9 @@ public class Product {
     @Column(name = "is_today_deal")
     private boolean isTodayDeal = false;
 
+    // 🔥 OPTIMISTIC LOCKING (ENG MUHIM QATOR)
+    @Version
+    private Long version;
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

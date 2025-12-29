@@ -69,6 +69,7 @@ public class FavoriteService {
                             p.getSoldCount(),
                             p.isTodayDeal(),
                             true,
+                            p.getStock(),
                             List.of(new ProductImageResponse(imageUrl, true))
                     );
 
