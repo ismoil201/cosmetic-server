@@ -20,7 +20,8 @@ public class ProductResponse {
 
 
     private Category category;
-    private double ratingAvg;
+    private BigDecimal ratingAvg;
+
     private int reviewCount;
     private int soldCount;
     private boolean isTodayDeal;

@@ -21,8 +21,8 @@ public class ProductDetailResponse {
     private Category category;
 
     private int stock;
+    private BigDecimal ratingAvg;
 
-    private double ratingAvg;
     private int reviewCount;
 
     private int soldCount;

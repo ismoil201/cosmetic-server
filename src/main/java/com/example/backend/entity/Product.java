@@ -43,8 +43,9 @@ public class Product {
     private int viewCount = 0;
 
     // 🔥 DB DA BOR, OLDIN YO‘Q EDI
-    @Column(name = "rating_avg")
-    private double ratingAvg = 0.0;
+    @Column(name = "rating_avg", precision = 3, scale = 2)
+    private BigDecimal ratingAvg = BigDecimal.ZERO;
+
 
     @Column(name = "review_count")
     private int reviewCount = 0;
