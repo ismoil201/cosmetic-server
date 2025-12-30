@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -23,25 +25,46 @@ public class ProductReviewService {
     @Transactional
     public void create(ReviewCreateRequest req) {
 
-        User user = userService.getCurrentUser();
+        if (req.getRating() < 1 || req.getRating() > 5) {
+            throw new RuntimeException("Rating must be between 1 and 5");
+        }
 
-        Order order = orderRepo.findById(req.getOrderId())
-                .filter(o -> o.getUser().getId().equals(user.getId()))
-                .orElseThrow(() -> new RuntimeException("Invalid order"));
+        User user = userService.getCurrentUser();
 
         Product product = productRepo.findById(req.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
+        Order order = orderRepo.findById(req.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        // 🔐 Order egasi tekshiriladi
+        if (!order.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Order does not belong to user");
+        }
+
+        // 🔐 Order ichida shu product bormi?
+        boolean hasProduct = order.getItems().stream()
+                .anyMatch(i -> i.getProduct().getId().equals(product.getId()));
+
+        if (!hasProduct) {
+            throw new RuntimeException("Product not found in this order");
+        }
+
+        // ❌ Bir marta review
+        if (reviewRepo.existsByUserAndProduct(user, product)) {
+            throw new RuntimeException("You already reviewed this product");
+        }
+
+        // 1️⃣ Review saqlash
         ProductReview review = new ProductReview();
         review.setUser(user);
         review.setProduct(product);
-        review.setOrder(order);
+        review.setOrder(order); // 🔥 juda muhim
         review.setRating(req.getRating());
         review.setContent(req.getContent());
-
         reviewRepo.save(review);
 
-        // 🔥 REVIEW RASMLAR
+        // 2️⃣ Review rasmlari
         if (req.getImageUrls() != null) {
             for (String url : req.getImageUrls()) {
                 ReviewImage img = new ReviewImage();
@@ -51,18 +74,25 @@ public class ProductReviewService {
             }
         }
 
-        // ⭐ rating / review_count update
-        int newCount = product.getReviewCount() + 1;
-        double newAvg =
-                (product.getRatingAvg() * product.getReviewCount() + req.getRating())
-                        / newCount;
+        // 3️⃣ ⭐ RATING AVG UPDATE
+        BigDecimal total = product.getRatingAvg()
+                .multiply(BigDecimal.valueOf(product.getReviewCount()));
 
-        product.setReviewCount(newCount);
+        BigDecimal newAvg = total
+                .add(BigDecimal.valueOf(req.getRating()))
+                .divide(
+                        BigDecimal.valueOf(product.getReviewCount() + 1),
+                        2,
+                        RoundingMode.HALF_UP
+                );
+
         product.setRatingAvg(newAvg);
+        product.setReviewCount(product.getReviewCount() + 1);
         productRepo.save(product);
     }
 
 
+    @Transactional(readOnly = true)
     public List<ReviewResponse> getByProduct(Long productId) {
 
         return reviewRepo.findByProductIdAndActiveTrue(productId)
