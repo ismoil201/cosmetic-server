@@ -64,4 +64,11 @@ public class ProductController {
         return productService.getTodayDeals();
     }
 
+
+    @PostMapping("/by-ids")
+    public List<ProductResponse> getByIds(@RequestBody List<Long> ids) {
+        return productService.getProductsByIds(ids);
+    }
+
+
 }

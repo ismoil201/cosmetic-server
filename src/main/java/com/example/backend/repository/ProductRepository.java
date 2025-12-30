@@ -22,6 +22,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 🏠 HOME
     Page<Product> findByActiveTrue(Pageable pageable);
 
+
+    List<Product> findByIdInAndActiveTrue(List<Long> ids);
+
+
     // 🔥 MUHIM: todayDeal bilan ishlaydigan QUERY
     @Modifying
     @Transactional

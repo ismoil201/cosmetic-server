@@ -204,6 +204,48 @@ public class ProductService {
         saveImages(product, req.getImageUrls());
     }
 
+
+    public List<ProductResponse> getProductsByIds(List<Long> ids) {
+
+        User user = userService.getCurrentUserOrNull();
+
+        return productRepo.findByIdInAndActiveTrue(ids)
+                .stream()
+                .map(p -> {
+
+                    boolean favorite = false;
+                    if (user != null) {
+                        favorite = favRepo.existsByUserAndProduct(user, p);
+                    }
+
+                    List<ProductImageResponse> images =
+                            productImageRepo.findByProductId(p.getId())
+                                    .stream()
+                                    .map(img -> new ProductImageResponse(
+                                            img.getImageUrl(),
+                                            img.isMain()
+                                    ))
+                                    .toList();
+
+                    return new ProductResponse(
+                            p.getId(),
+                            p.getName(),
+                            p.getBrand(),
+                            p.getPrice(),
+                            p.getDiscountPrice(),
+                            p.getCategory(),
+                            p.getRatingAvg(),
+                            p.getReviewCount(),
+                            p.getSoldCount(),
+                            p.isTodayDeal(),
+                            favorite,
+                            p.getStock(),
+                            images
+                    );
+                })
+                .toList();
+    }
+
     /* ================= HELPERS ================= */
 
     private void saveImages(Product product, List<String> imageUrls) {
