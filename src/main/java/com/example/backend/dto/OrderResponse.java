@@ -15,6 +15,8 @@ public class OrderResponse {
     private OrderStatus status;
     private double totalAmount;
     private LocalDateTime createdAt;
+    private Double latitude;
+    private Double longitude;
 
     private List<OrderItemResponse> items;
 }

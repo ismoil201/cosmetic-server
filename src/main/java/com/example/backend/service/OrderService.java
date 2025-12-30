@@ -51,7 +51,10 @@ public class OrderService {
         Order order = new Order();
         order.setUser(user);
         order.setAddress(req.getAddress());
+        order.setLatitude(req.getLatitude());
+        order.setLongitude(req.getLongitude());
         order.setPhone(req.getPhone());
+
         order.setStatus(OrderStatus.PENDING);
         order.setTotalAmount(0);
 

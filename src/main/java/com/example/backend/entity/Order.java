@@ -24,6 +24,9 @@ public class Order {
 
     private String address;
 
+    // ✅ YANGI QO‘SHILDI
+    private Double latitude;
+    private Double longitude;
     private String phone;
 
     @Enumerated(EnumType.STRING)
