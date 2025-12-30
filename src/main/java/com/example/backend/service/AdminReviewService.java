@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 @Service
 @RequiredArgsConstructor
 public class AdminReviewService {
@@ -29,25 +32,52 @@ public class AdminReviewService {
 
         // ❗ Agar BLOCK qilinsa → ratingdan AYIRAMIZ
         if (!active) {
-            int newCount = product.getReviewCount() - 1;
-            double newAvg = newCount == 0 ? 0 :
-                    (product.getRatingAvg() * product.getReviewCount() - review.getRating())
-                            / newCount;
+
+            int oldCount = product.getReviewCount();
+            int newCount = oldCount - 1;
+
+            BigDecimal newAvg;
+
+            if (newCount <= 0) {
+                newAvg = BigDecimal.ZERO;
+            } else {
+                BigDecimal total = product.getRatingAvg()
+                        .multiply(BigDecimal.valueOf(oldCount));
+
+                total = total.subtract(BigDecimal.valueOf(review.getRating()));
+
+                newAvg = total.divide(
+                        BigDecimal.valueOf(newCount),
+                        2,
+                        RoundingMode.HALF_UP
+                );
+            }
 
             product.setReviewCount(newCount);
             product.setRatingAvg(newAvg);
         }
+
 
         // ❗ Agar UNBLOCK qilinsa → ratingga QO‘SHAMIZ
         if (active) {
-            int newCount = product.getReviewCount() + 1;
-            double newAvg =
-                    (product.getRatingAvg() * product.getReviewCount() + review.getRating())
-                            / newCount;
+
+            int oldCount = product.getReviewCount();
+            int newCount = oldCount + 1;
+
+            BigDecimal total = product.getRatingAvg()
+                    .multiply(BigDecimal.valueOf(oldCount))
+                    .add(BigDecimal.valueOf(review.getRating()));
+
+            BigDecimal newAvg = total.divide(
+                    BigDecimal.valueOf(newCount),
+                    2,
+                    RoundingMode.HALF_UP
+            );
 
             product.setReviewCount(newCount);
             product.setRatingAvg(newAvg);
         }
+
 
         review.setActive(active);
         productRepo.save(product);
@@ -64,15 +94,31 @@ public class AdminReviewService {
         Product product = review.getProduct();
 
         if (review.isActive()) {
-            int newCount = product.getReviewCount() - 1;
-            double newAvg = newCount == 0 ? 0 :
-                    (product.getRatingAvg() * product.getReviewCount() - review.getRating())
-                            / newCount;
+
+            int oldCount = product.getReviewCount();
+            int newCount = oldCount - 1;
+
+            BigDecimal newAvg;
+
+            if (newCount <= 0) {
+                newAvg = BigDecimal.ZERO;
+            } else {
+                BigDecimal total = product.getRatingAvg()
+                        .multiply(BigDecimal.valueOf(oldCount))
+                        .subtract(BigDecimal.valueOf(review.getRating()));
+
+                newAvg = total.divide(
+                        BigDecimal.valueOf(newCount),
+                        2,
+                        RoundingMode.HALF_UP
+                );
+            }
 
             product.setReviewCount(newCount);
             product.setRatingAvg(newAvg);
             productRepo.save(product);
         }
+
 
         reviewRepo.delete(review);
     }
