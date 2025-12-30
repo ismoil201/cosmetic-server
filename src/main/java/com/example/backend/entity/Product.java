@@ -3,6 +3,7 @@ package com.example.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 @Entity
 @Table(name = "products")
@@ -22,11 +23,11 @@ public class Product {
     @Column(length = 2000)
     private String description;
 
-    private double price;
+    @Column(precision = 15, scale = 2)
+    private BigDecimal price;
 
-    @Column(name = "discount_price")
-    private double discountPrice;
-
+    @Column(name = "discount_price", precision = 15, scale = 2)
+    private BigDecimal discountPrice;
 
     private String brand;
 

@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -89,7 +90,8 @@ public class CartService {
                             .map(ProductImage::getImageUrl)
                             .orElse(null);
 
-                    double finalPrice = p.getDiscountPrice() > 0
+                    BigDecimal finalPrice = (p.getDiscountPrice() != null
+                            && p.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0)
                             ? p.getDiscountPrice()
                             : p.getPrice();
 

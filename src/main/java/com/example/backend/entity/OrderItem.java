@@ -1,8 +1,9 @@
 package com.example.backend.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "order_items")
@@ -16,15 +17,19 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 🔗 Qaysi orderga tegishli
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    // 🛍 Qaysi product snapshoti
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
     private int quantity;
 
-    private double price; // snapshot (discount bilan)
+    // 💰 SNAPSHOT PRICE (ENG MUHIM FIX)
+    @Column(nullable = false, precision = 15, scale = 2)
+    private BigDecimal price;
 }

@@ -4,6 +4,7 @@ import com.example.backend.entity.Category;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -15,8 +16,8 @@ public class ProductDetailResponse {
     private String description;
     private String brand;
 
-    private double price;
-    private double discountPrice;
+    private BigDecimal price;
+    private BigDecimal discountPrice;
     private Category category;
 
     private int stock;

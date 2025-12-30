@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -20,86 +21,89 @@ public class OrderService {
     private final ProductImageRepository productImageRepo;
     private final UserService userService;
 
+    // ✅ FINAL: receiver + address manbalari
+    private final ReceiverService receiverService;
+    private final AddressService addressService;
+
+    private final OrderStatusHistoryService orderStatusHistoryService;
+
     /* ================= CREATE ORDER (CART → ORDER) ================= */
 
     @Transactional
     public OrderResponse create(OrderCreateRequest req) {
 
         User user = userService.getCurrentUser();
-        List<CartItem> cartItems = cartRepo.findByUserId(user.getId());
 
+        Receiver receiver = receiverService.getOwnedByCurrentUser(req.getReceiverId());
+        Address address = addressService.getOwnedByCurrentUser(req.getAddressId());
+
+        List<CartItem> cartItems = cartRepo.findByUserId(user.getId());
         if (cartItems.isEmpty()) {
             throw new RuntimeException("Cart is empty");
         }
 
-        // 🔒 1. STOCKNI AVVAL TEKSHIRIB OLAMIZ
-        for (CartItem c : cartItems) {
-            Product p = c.getProduct();
-
-            if (!p.isActive()) {
-                throw new RuntimeException("Product is not active: " + p.getName());
-            }
-
-            if (c.getQuantity() > p.getStock()) {
-                throw new RuntimeException(
-                        "Not enough stock for product: " + p.getName()
-                );
-            }
-        }
-
-        // 🔒 2. ORDER CREATE
         Order order = new Order();
         order.setUser(user);
-        order.setAddress(req.getAddress());
-        order.setLatitude(req.getLatitude());
-        order.setLongitude(req.getLongitude());
-        order.setPhone(req.getPhone());
+
+        // 🔗 FK
+        order.setReceiverId(receiver.getId());
+        order.setAddressId(address.getId());
+
+        // 📸 SNAPSHOT
+        order.setAddress(address.getAddress());
+        order.setLatitude(address.getLatitude());
+        order.setLongitude(address.getLongitude());
+        order.setPhone(receiver.getPhone());
 
         order.setStatus(OrderStatus.PENDING);
-        order.setTotalAmount(0);
+        order.setTotalAmount(BigDecimal.ZERO);
 
         order = orderRepo.save(order);
 
-        double total = 0;
+        orderStatusHistoryService.log(order, OrderStatus.PENDING);
 
-        // 🔥 3. ORDER ITEMS + STOCK KAMAYTIRISH
+
+        BigDecimal total = BigDecimal.ZERO;
+
         for (CartItem c : cartItems) {
 
             Product product = c.getProduct();
 
-            // 🔥 STOCK KAMAYADI
+            if (product.getStock() < c.getQuantity()) {
+                throw new RuntimeException(
+                        "Not enough stock for product: " + product.getName()
+                );
+            }
+
             product.setStock(product.getStock() - c.getQuantity());
             productRepo.save(product);
 
-            double price = product.getDiscountPrice() > 0
-                    ? product.getDiscountPrice()
-                    : product.getPrice();
+            BigDecimal price =
+                    product.getDiscountPrice() != null
+                            && product.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0
+                            ? product.getDiscountPrice()
+                            : product.getPrice();
 
             OrderItem item = new OrderItem();
             item.setOrder(order);
             item.setProduct(product);
             item.setQuantity(c.getQuantity());
-            item.setPrice(price); // snapshot
+            item.setPrice(price);
 
             orderItemRepo.save(item);
-
-            total += price * c.getQuantity();
         }
 
         order.setTotalAmount(total);
         orderRepo.save(order);
 
-        // 🧹 4. CART TOZALANADI
         cartRepo.deleteByUserId(user.getId());
 
-        // ✅ Hammasi muvaffaqiyatli → commit
         return detail(order.getId());
     }
 
     /* ================= MY ORDERS ================= */
 
     public List<OrderResponse> myOrders() {
-
         User user = userService.getCurrentUser();
 
         return orderRepo.findByUserId(user.getId())
@@ -115,17 +119,13 @@ public class OrderService {
         User user = userService.getCurrentUser();
 
         Order order = orderRepo.findById(orderId)
-                .filter(o ->
-                        o.getUser().getId().equals(user.getId())
-                                || user.getRole() == Role.ADMIN
-                )
+                .filter(o -> o.getUser().getId().equals(user.getId()) || user.getRole() == Role.ADMIN)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
         List<OrderItemResponse> items =
                 orderItemRepo.findByOrderId(order.getId())
                         .stream()
                         .map(i -> {
-
                             String imageUrl = productImageRepo
                                     .findByProductIdAndMainTrue(i.getProduct().getId())
                                     .map(ProductImage::getImageUrl)
@@ -146,8 +146,13 @@ public class OrderService {
                 order.getStatus(),
                 order.getTotalAmount(),
                 order.getCreatedAt(),
+                order.getAddress(),
+                order.getLatitude(),
+                order.getLongitude(),
+                order.getPhone(),
                 items
         );
+
     }
 
     /* ================= ADMIN: ALL ORDERS ================= */
@@ -170,38 +175,33 @@ public class OrderService {
         OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
 
         // 🔥 SOLD COUNT FAQAT PAID GA O‘TGANDA
-        if (order.getStatus() != OrderStatus.PAID
-                && newStatus == OrderStatus.PAID) {
+        if (order.getStatus() != OrderStatus.PAID && newStatus == OrderStatus.PAID) {
 
-            List<OrderItem> items =
-                    orderItemRepo.findByOrder(order);
+            List<OrderItem> items = orderItemRepo.findByOrder(order);
 
             for (OrderItem item : items) {
                 Product product = item.getProduct();
-                product.setSoldCount(
-                        product.getSoldCount() + item.getQuantity()
-                );
+                product.setSoldCount(product.getSoldCount() + item.getQuantity());
                 productRepo.save(product);
             }
         }
 
         // 🔄 AGAR CANCEL BO‘LSA → STOCK QAYTADI
-        if (order.getStatus() != OrderStatus.CANCELED
-                && newStatus == OrderStatus.CANCELED) {
+        if (order.getStatus() != OrderStatus.CANCELED && newStatus == OrderStatus.CANCELED) {
 
-            List<OrderItem> items =
-                    orderItemRepo.findByOrder(order);
+            List<OrderItem> items = orderItemRepo.findByOrder(order);
 
             for (OrderItem item : items) {
                 Product product = item.getProduct();
-                product.setStock(
-                        product.getStock() + item.getQuantity()
-                );
+                product.setStock(product.getStock() + item.getQuantity());
                 productRepo.save(product);
             }
         }
 
         order.setStatus(newStatus);
         orderRepo.save(order);
+
+        orderStatusHistoryService.log(order, newStatus);
+
     }
 }

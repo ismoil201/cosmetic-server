@@ -3,6 +3,7 @@ package com.example.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,23 +19,36 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 👤 Kim buyurtma qildi
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // 🔗 FK (history / analytics uchun)
+    @Column(name = "receiver_id", nullable = false)
+    private Long receiverId;
+
+    @Column(name = "address_id", nullable = false)
+    private Long addressId;
+
+    // 📍 SNAPSHOT
+    @Column(nullable = false)
     private String address;
 
-    // ✅ YANGI QO‘SHILDI
     private Double latitude;
     private Double longitude;
+
+    // 📞 SNAPSHOT
+    @Column(nullable = false, length = 20)
     private String phone;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.PENDING;
 
-    @Column(name = "total_amount", nullable = false)
-    private double totalAmount;
+    // 💰 MONEY
+    @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal totalAmount;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -43,7 +57,7 @@ public class Order {
     private List<OrderItem> items;
 
     @PrePersist
-    public void onCreate() {
+    void onCreate() {
         createdAt = LocalDateTime.now();
     }
 }

@@ -4,6 +4,7 @@ import com.example.backend.entity.OrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -13,10 +14,19 @@ public class OrderResponse {
 
     private Long id;
     private OrderStatus status;
-    private double totalAmount;
+
+    // 💰 BIGDECIMAL (ENG MUHIM FIX)
+    private BigDecimal totalAmount;
+
     private LocalDateTime createdAt;
+
+    // 📍 SNAPSHOT
+    private String address;
     private Double latitude;
     private Double longitude;
+
+    // 📞 SNAPSHOT
+    private String phone;
 
     private List<OrderItemResponse> items;
 }
