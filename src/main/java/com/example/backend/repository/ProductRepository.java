@@ -19,9 +19,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // ✅ ADMIN
     Page<Product> findByActive(boolean active, Pageable pageable);
 
-    // 🏠 HOME
-    Page<Product> findByActiveTrue(Pageable pageable);
-
 
     List<Product> findByIdInAndActiveTrue(List<Long> ids);
 
@@ -34,14 +31,48 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByIsTodayDealTrueAndActiveTrue();
 
+    // HIT (bugun xit)
+    List<Product> findTop10ByIsTodayDealTrueAndActiveTrueOrderByCreatedAtDesc();
+
+    // limit dinamik bo‘lishi uchun Pageable bilan:
+    Page<Product> findByIsTodayDealTrueAndActiveTrue(Pageable pageable);
+
+    // DISCOUNT (discount_price bor)
+    Page<Product> findByDiscountPriceIsNotNullAndActiveTrue(Pageable pageable);
+
+    // NEW ARRIVALS (eng yangi)
+    Page<Product> findByActiveTrueOrderByCreatedAtDesc(Pageable pageable);
+
+    // POPULAR (view_count yoki sold_count bo‘yicha)
+    Page<Product> findByActiveTrue(Pageable pageable);
 
 
-    // 🔎 CATEGORY
-    Page<Product> findByCategoryAndActiveTrue(Category category, Pageable pageable);
 
-    // 🔥 BRAND
-    Page<Product> findByBrandAndActiveTrue(String brand, Pageable pageable);
+    @Query("""
+    select p from Product p
+    where p.active=true
+      and p.discountPrice is not null
+      and p.discountPrice < p.price
+""")
+    Page<Product> findDiscounted(Pageable pageable);
 
-    // 💰 SALE (discount bor)
-    Page<Product> findByDiscountPriceGreaterThanAndActiveTrue(double discountPrice, Pageable pageable);
+
+
+    @Query("""
+    select p from Product p
+    where (:active is null or p.active = :active)
+      and (:category is null or p.category = :category)
+      and (:brand is null or lower(p.brand) like lower(concat('%', :brand, '%')))
+      and (:todayDeal is null or p.isTodayDeal = :todayDeal)
+      and (:keyword is null or lower(p.name) like lower(concat('%', :keyword, '%')))
+""")
+    Page<Product> adminSearch(
+            Boolean active,
+            Category category,
+            String brand,
+            Boolean todayDeal,
+            String keyword,
+            Pageable pageable
+    );
+
 }

@@ -53,7 +53,7 @@ public class FavoriteService {
                     Product p = f.getProduct();
 
                     String imageUrl = productImageRepo
-                            .findByProductIdAndMainTrue(p.getId())
+                            .findFirstByProductIdAndMainTrue(p.getId())
                             .map(ProductImage::getImageUrl)
                             .orElse(null);
 

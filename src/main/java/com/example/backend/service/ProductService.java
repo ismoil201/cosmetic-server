@@ -1,16 +1,14 @@
 package com.example.backend.service;
 
 import com.example.backend.dto.*;
-import com.example.backend.entity.Category;
-import com.example.backend.entity.Product;
-import com.example.backend.entity.ProductImage;
-import com.example.backend.entity.User;
+import com.example.backend.entity.*;
 import com.example.backend.repository.FavoriteRepository;
 import com.example.backend.repository.ProductDetailImageRepository;
 import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +35,8 @@ public class ProductService {
         productRepo.save(product);
 
         saveImages(product, req.getImageUrls());
+        saveDetailImages(product, req.getDetailImages()); // ✅ qo‘shildi
+
     }
 
     /* ================= DELETE ================= */
@@ -44,6 +44,8 @@ public class ProductService {
     @Transactional
     public void delete(Long id) {
         productImageRepo.deleteByProductId(id);
+        detailImageRepo.deleteByProductId(id); // ✅ qo‘shildi
+
         productRepo.deleteById(id);
     }
 
@@ -201,7 +203,10 @@ public class ProductService {
         productRepo.save(product);
 
         productImageRepo.deleteByProductId(product.getId());
+        detailImageRepo.deleteByProductId(product.getId()); // ✅ qo‘shildi
+
         saveImages(product, req.getImageUrls());
+        saveDetailImages(product, req.getDetailImages());   // ✅ qo‘shildi
     }
 
 
@@ -259,6 +264,78 @@ public class ProductService {
             productImageRepo.save(img);
         }
     }
+
+    private ProductCardResponse toCard(Product p, User user) {
+        boolean favorite = (user != null) && favRepo.existsByUserAndProduct(user, p);
+
+        String mainImage = productImageRepo
+                .findFirstByProductIdAndMainTrue(p.getId())
+                .map(ProductImage::getImageUrl)
+                .orElse(null);
+
+        return new ProductCardResponse(
+                p.getId(),
+                p.getName(),
+                p.getBrand(),
+                p.getPrice(),
+                p.getDiscountPrice(),
+                p.getCategory(),
+                p.getRatingAvg(),
+                p.getReviewCount(),
+                p.getSoldCount(),
+                p.isTodayDeal(),
+                favorite,
+                p.getStock(),
+                mainImage
+        );
+    }
+
+    public Page<ProductCardResponse> getPopular(Pageable pageable) {
+        User user = userService.getCurrentUserOrNull();
+        return productRepo.findByActiveTrueOrderBySoldCountDesc(pageable)
+                .map(p -> toCard(p, user));
+    }
+
+    public List<ProductCardResponse> getHits(int limit) {
+        User user = userService.getCurrentUserOrNull();
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepo.findByIsTodayDealTrueAndActiveTrue(pageable)
+                .map(p -> toCard(p, user))
+                .getContent();
+    }
+
+    public List<ProductCardResponse> getDiscounts(int limit) {
+        User user = userService.getCurrentUserOrNull();
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepo.findDiscounted(pageable)
+                .map(p -> toCard(p, user))
+                .getContent();
+    }
+
+    public List<ProductCardResponse> getNewArrivals(int limit) {
+        User user = userService.getCurrentUserOrNull();
+        Pageable pageable = PageRequest.of(0, limit);
+        return productRepo.findByActiveTrueOrderByCreatedAtDesc(pageable)
+                .map(p -> toCard(p, user))
+                .getContent();
+    }
+
+
+    private void saveDetailImages(
+            Product product,
+            List<ProductDetailImageRequest> detailImages
+    ) {
+        if (detailImages == null || detailImages.isEmpty()) return;
+
+        for (ProductDetailImageRequest req : detailImages) {
+            ProductDetailImage img = new ProductDetailImage();
+            img.setProduct(product);
+            img.setImageUrl(req.getImageUrl());
+            img.setSortOrder(req.getSortOrder());
+            detailImageRepo.save(img);
+        }
+    }
+
 
     private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());

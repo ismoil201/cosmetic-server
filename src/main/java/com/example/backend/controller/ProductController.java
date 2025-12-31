@@ -19,18 +19,50 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
-
+    /**
+     * PUBLIC: Product list (pagination)
+     * Example: /api/products?page=0&size=20
+     */
     // 🔓 PUBLIC (TOKEN KERAK EMAS)
     @GetMapping
     public Page<ProductResponse> list(Pageable pageable) {
         return productService.getHomeProducts(pageable);
     }
-
+    /**
+     * PUBLIC: Product detail
+     * Example: /api/products/12
+     */
     // 🔓 PUBLIC (TOKEN KERAK EMAS)
     @GetMapping("/{id}")
     public ProductDetailResponse detail(@PathVariable Long id) {
         return productService.getDetail(id);
     }
+
+
+    /**
+     * PUBLIC: Today deals list
+     * Example: /api/products/today-deals
+     */
+    @GetMapping("/today-deals")
+    public List<ProductResponse> todayDeals() {
+        return productService.getTodayDeals();
+    }
+
+    /**
+     * PUBLIC: Get products by ids (for cart/favorites local list)
+     * Example: POST /api/products/by-ids
+     * Body: [1,2,3]
+     */
+    @PostMapping("/by-ids")
+    public List<ProductResponse> getByIds(@RequestBody List<Long> ids) {
+        return productService.getProductsByIds(ids);
+    }
+
+    // ================= ADMIN =================
+
+    /**
+     * ADMIN: Create product
+     */
 
     // 🔐 ADMIN
     @PreAuthorize("hasRole('ADMIN')")
@@ -57,17 +89,6 @@ public class ProductController {
     public ResponseEntity<?> delete(@PathVariable Long id) {
         productService.delete(id);
         return ResponseEntity.ok("Deleted");
-    }
-
-    @GetMapping("/today-deals")
-    public List<ProductResponse> todayDeals() {
-        return productService.getTodayDeals();
-    }
-
-
-    @PostMapping("/by-ids")
-    public List<ProductResponse> getByIds(@RequestBody List<Long> ids) {
-        return productService.getProductsByIds(ids);
     }
 
 

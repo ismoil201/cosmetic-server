@@ -1,5 +1,6 @@
 package com.example.backend.controller;
 
+import com.example.backend.dto.AdminProductDetailResponse;
 import com.example.backend.dto.AdminProductResponse;
 import com.example.backend.dto.ProductCreateRequest;
 import com.example.backend.service.AdminProductService;
@@ -18,12 +19,20 @@ public class AdminProductController {
 
     private final AdminProductService adminProductService;
 
+
+
     @GetMapping
     public Page<AdminProductResponse> list(
             @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) Boolean todayDeal,
+            @RequestParam(required = false) String keyword,
             Pageable pageable
     ) {
-        return adminProductService.list(active, pageable);
+        return adminProductService.list(
+                active, category, brand, todayDeal, keyword, pageable
+        );
     }
 
     @PostMapping
@@ -45,6 +54,27 @@ public class AdminProductController {
     public ResponseEntity<?> softDelete(@PathVariable Long id) {
         adminProductService.softDelete(id);
         return ResponseEntity.ok("Deactivated");
+    }
+
+
+    @GetMapping("/{id}")
+    public AdminProductDetailResponse detail(@PathVariable Long id) {
+        return adminProductService.detail(id);
+    }
+
+    @PutMapping("/{id}/active")
+    public ResponseEntity<?> toggleActive(
+            @PathVariable Long id,
+            @RequestParam boolean active
+    ) {
+        adminProductService.setActive(id, active);
+        return ResponseEntity.ok("Active updated");
+    }
+
+    @PutMapping("/{id}/active")
+    public ResponseEntity<?> setActive(@PathVariable Long id, @RequestParam boolean active) {
+        adminProductService.setActive(id, active);
+        return ResponseEntity.ok("Active updated");
     }
 
     @PutMapping("/{id}/restore")

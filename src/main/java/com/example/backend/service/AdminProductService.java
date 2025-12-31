@@ -1,8 +1,6 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.AdminProductResponse;
-import com.example.backend.dto.ProductCreateRequest;
-import com.example.backend.dto.ProductDetailImageRequest;
+import com.example.backend.dto.*;
 import com.example.backend.entity.Category;
 import com.example.backend.entity.Product;
 import com.example.backend.entity.ProductDetailImage;
@@ -26,13 +24,27 @@ public class AdminProductService {
 
 
     // ================= ADMIN LIST =================
-    public Page<AdminProductResponse> list(Boolean active, Pageable pageable) {
+    public Page<AdminProductResponse> list(
+            Boolean active,
+            String category,
+            String brand,
+            Boolean todayDeal,
+            String keyword,
+            Pageable pageable
+    ) {
 
-        Page<Product> page = (active == null)
-                ? productRepo.findAll(pageable)
-                : productRepo.findByActive(active, pageable);
+        Category cat = null;
+        if (category != null) {
+            try {
+                cat = Category.valueOf(category.toUpperCase());
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid category");
+            }
+        }
 
-         return page.map(p -> new AdminProductResponse(
+        return productRepo.adminSearch(
+                active, cat, brand, todayDeal, keyword, pageable
+        ).map(p -> new AdminProductResponse(
                 p.getId(),
                 p.getName(),
                 p.getBrand(),
@@ -44,12 +56,48 @@ public class AdminProductService {
                 p.isTodayDeal(),
                 p.getSoldCount()
         ));
-
     }
+
+    public AdminProductDetailResponse detail(Long id) {
+
+        Product p = productRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        var imageUrls = productImageRepo.findByProductId(p.getId())
+                .stream()
+                .map(ProductImage::getImageUrl)
+                .toList();
+
+        var detailImages = detailImageRepo
+                .findByProductIdOrderBySortOrderAsc(p.getId())
+                .stream()
+                .map(d -> new ProductDetailImageResponse(
+                        d.getImageUrl(),
+                        d.getSortOrder()
+                ))
+                .toList();
+
+        return new AdminProductDetailResponse(
+                p.getId(),
+                p.getName(),
+                p.getDescription(),
+                p.getBrand(),
+                p.getPrice(),
+                p.getDiscountPrice(),
+                p.getCategory(),
+                p.getStock(),
+                p.isActive(),
+                p.isTodayDeal(),
+                imageUrls,
+                detailImages
+        );
+    }
+
 
     // ================= CREATE =================
     @Transactional
     public void create(ProductCreateRequest req) {
+        validate(req);
 
         Product product = new Product();
         map(req, product);
@@ -63,6 +111,7 @@ public class AdminProductService {
     // ================= UPDATE =================
     @Transactional
     public void update(Long id, ProductCreateRequest req) {
+        validate(req);
 
         Product product = productRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -126,19 +175,64 @@ public class AdminProductService {
 
         if (req.getDetailImages() == null) return;
 
-        for (ProductDetailImageRequest d : req.getDetailImages()) {
+        for (int i = 0; i < req.getDetailImages().size(); i++) {
+
+            ProductDetailImageRequest d = req.getDetailImages().get(i);
 
             ProductDetailImage img = new ProductDetailImage();
             img.setProduct(product);
             img.setImageUrl(d.getImageUrl());
-            img.setSortOrder(d.getSortOrder());
+
+            int order = d.getSortOrder() > 0 ? d.getSortOrder() : i + 1;
+            img.setSortOrder(order);
 
             detailImageRepo.save(img);
         }
     }
 
 
+
+    @Transactional
+    public void setActive(Long id, boolean active) {
+
+        Product p = productRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        p.setActive(active);
+        productRepo.save(p);
+    }
+
+
+
+    private void validate(ProductCreateRequest req) {
+
+        if (req.getName() == null || req.getName().isBlank())
+            throw new RuntimeException("Product name is required");
+
+        if (req.getPrice() == null || req.getPrice().signum() <= 0)
+            throw new RuntimeException("Price must be greater than 0");
+
+        if (req.getDiscountPrice() != null && req.getDiscountPrice().signum() < 0)
+            throw new RuntimeException("Discount price must be >= 0");
+
+        if (req.getDiscountPrice() != null
+                && req.getPrice() != null
+                && req.getDiscountPrice().compareTo(req.getPrice()) > 0)
+            throw new RuntimeException("Discount price cannot be greater than price");
+
+        if (req.getStock() < 0)
+            throw new RuntimeException("Stock must be >= 0");
+
+        if (req.getCategory() == null)
+            throw new RuntimeException("Category is required");
+    }
+
+
+
     private void map(ProductCreateRequest req, Product p) {
+
+        validate(req);
+
         p.setName(req.getName());
         p.setDescription(req.getDescription());
         p.setBrand(req.getBrand());
@@ -146,6 +240,11 @@ public class AdminProductService {
         p.setDiscountPrice(req.getDiscountPrice());
         p.setStock(req.getStock());
 
-        p.setCategory(Category.valueOf(req.getCategory().toUpperCase()));
+        try {
+            p.setCategory(Category.valueOf(req.getCategory().toUpperCase()));
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid category: " + req.getCategory());
+        }
     }
+
 }

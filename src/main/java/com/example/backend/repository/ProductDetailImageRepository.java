@@ -2,12 +2,16 @@ package com.example.backend.repository;
 
 import com.example.backend.entity.ProductDetailImage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 public interface ProductDetailImageRepository
         extends JpaRepository<ProductDetailImage, Long> {
 
+    @Modifying
+    @Transactional
     void deleteByProductId(Long productId);
 
 

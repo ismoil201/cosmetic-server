@@ -86,9 +86,10 @@ public class CartService {
 
                     // 🔥 MAIN IMAGE
                     String imageUrl = productImageRepo
-                            .findByProductIdAndMainTrue(p.getId())
+                            .findFirstByProductIdAndMainTrue(p.getId())
                             .map(ProductImage::getImageUrl)
                             .orElse(null);
+
 
                     BigDecimal finalPrice = (p.getDiscountPrice() != null
                             && p.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0)
