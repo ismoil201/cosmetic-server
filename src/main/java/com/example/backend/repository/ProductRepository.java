@@ -23,6 +23,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByIdInAndActiveTrue(List<Long> ids);
 
 
+
+    // 🔥 POPULAR (sold_count DESC)
+    Page<Product> findByActiveTrueOrderBySoldCountDesc(Pageable pageable);
+
+
+
     // 🔥 MUHIM: todayDeal bilan ishlaydigan QUERY
     @Modifying
     @Transactional

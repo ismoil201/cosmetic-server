@@ -127,7 +127,7 @@ public class OrderService {
                         .stream()
                         .map(i -> {
                             String imageUrl = productImageRepo
-                                    .findByProductIdAndMainTrue(i.getProduct().getId())
+                                    .findFirstByProductIdAndMainTrue(i.getProduct().getId())
                                     .map(ProductImage::getImageUrl)
                                     .orElse(null);
 
