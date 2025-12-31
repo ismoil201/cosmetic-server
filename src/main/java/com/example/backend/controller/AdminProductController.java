@@ -72,10 +72,14 @@ public class AdminProductController {
     }
 
     @PutMapping("/{id}/active")
-    public ResponseEntity<?> setActive(@PathVariable Long id, @RequestParam boolean active) {
+    public ResponseEntity<?> setActive(
+            @PathVariable Long id,
+            @RequestParam boolean active
+    ) {
         adminProductService.setActive(id, active);
         return ResponseEntity.ok("Active updated");
     }
+
 
     @PutMapping("/{id}/restore")
     public ResponseEntity<?> restore(@PathVariable Long id) {

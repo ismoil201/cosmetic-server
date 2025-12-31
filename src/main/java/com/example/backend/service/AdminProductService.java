@@ -194,13 +194,13 @@ public class AdminProductService {
 
     @Transactional
     public void setActive(Long id, boolean active) {
-
-        Product p = productRepo.findById(id)
+        Product product = productRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        p.setActive(active);
-        productRepo.save(p);
+        product.setActive(active);
+        productRepo.save(product);
     }
+
 
 
 
