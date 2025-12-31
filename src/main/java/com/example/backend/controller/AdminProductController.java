@@ -61,16 +61,6 @@ public class AdminProductController {
     public AdminProductDetailResponse detail(@PathVariable Long id) {
         return adminProductService.detail(id);
     }
-
-    @PutMapping("/{id}/active")
-    public ResponseEntity<?> toggleActive(
-            @PathVariable Long id,
-            @RequestParam boolean active
-    ) {
-        adminProductService.setActive(id, active);
-        return ResponseEntity.ok("Active updated");
-    }
-
     @PutMapping("/{id}/active")
     public ResponseEntity<?> setActive(
             @PathVariable Long id,
@@ -79,6 +69,13 @@ public class AdminProductController {
         adminProductService.setActive(id, active);
         return ResponseEntity.ok("Active updated");
     }
+
+    @PutMapping("/{id}/toggle-active")
+    public ResponseEntity<?> toggleActive(@PathVariable Long id) {
+        adminProductService.toggleActive(id); // yangi method
+        return ResponseEntity.ok("Active toggled");
+    }
+
 
 
     @PutMapping("/{id}/restore")

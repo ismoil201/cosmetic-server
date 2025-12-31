@@ -202,6 +202,13 @@ public class AdminProductService {
     }
 
 
+    @Transactional
+    public void toggleActive(Long id) {
+        Product p = productRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        p.setActive(!p.isActive());
+        productRepo.save(p);
+    }
 
 
     private void validate(ProductCreateRequest req) {
