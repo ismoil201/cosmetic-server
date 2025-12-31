@@ -29,20 +29,20 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
 
-                        // 🔓 AUTH
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // 🔓 PUBLIC PRODUCTS (🔥 METHOD YO‘Q!)
+                        // ✅ HOME (PUBLIC)
+                        .requestMatchers("/api/home/**").permitAll()
+
+                        // ✅ PRODUCTS (PUBLIC)
                         .requestMatchers("/api/products/**").permitAll()
-                        .requestMatchers("/api/reviews/product/**").permitAll() // 🔥 MUHIM
+                        .requestMatchers("/api/reviews/product/**").permitAll()
 
-
-                        // 🔓 ERROR (MUHIM!)
                         .requestMatchers("/error").permitAll()
 
-                        // 🔐 QOLGAN HAMMASI
                         .anyRequest().authenticated()
                 )
+
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
