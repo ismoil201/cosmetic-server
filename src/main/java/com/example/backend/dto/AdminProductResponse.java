@@ -20,5 +20,6 @@ public class AdminProductResponse {
     private boolean isTodayDeal;
     private int soldCount;
     // 🔥
+    private String mainImageUrl;
 
 }

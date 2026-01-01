@@ -23,6 +23,7 @@ public class AdminProductService {
     private final ProductDetailImageRepository detailImageRepo;
 
 
+    private final ProductImageRepository productImageRepository;
     // ================= ADMIN LIST =================
     public Page<AdminProductResponse> list(
             Boolean active,
@@ -42,6 +43,7 @@ public class AdminProductService {
             }
         }
 
+
         return productRepo.adminSearch(
                 active, cat, brand, todayDeal, keyword, pageable
         ).map(p -> new AdminProductResponse(
@@ -54,7 +56,11 @@ public class AdminProductService {
                 p.isActive(),
                 p.getCategory(),
                 p.isTodayDeal(),
-                p.getSoldCount()
+                p.getSoldCount(),
+                productImageRepository
+                        .findFirstByProductIdAndMainTrue(p.getId())
+                        .map(ProductImage::getImageUrl)
+                        .orElse(null)
         ));
     }
 
