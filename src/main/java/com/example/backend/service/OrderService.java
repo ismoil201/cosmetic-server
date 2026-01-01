@@ -24,6 +24,7 @@ public class OrderService {
     // ✅ FINAL: receiver + address manbalari
     private final ReceiverService receiverService;
     private final AddressService addressService;
+    private final UserRepository userRepo;
 
     private final OrderStatusHistoryService orderStatusHistoryService;
 
@@ -141,6 +142,8 @@ public class OrderService {
                         })
                         .toList();
 
+
+
         return new OrderResponse(
                 order.getId(),
                 order.getStatus(),
@@ -149,6 +152,7 @@ public class OrderService {
                 order.getAddress(),
                 order.getLatitude(),
                 order.getLongitude(),
+                user.getFullName(),
                 order.getPhone(),
                 items
         );

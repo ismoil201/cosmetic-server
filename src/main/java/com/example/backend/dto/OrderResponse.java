@@ -25,6 +25,7 @@ public class OrderResponse {
     private Double latitude;
     private Double longitude;
 
+    private String fullName;
     // 📞 SNAPSHOT
     private String phone;
 
