@@ -3,10 +3,12 @@ package com.example.backend.controller;
 import com.example.backend.dto.OrderResponse;
 import com.example.backend.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -22,11 +24,9 @@ public class AdminController {
     }
 
     @PutMapping("/orders/{id}/status")
-    public String updateStatus(
-            @PathVariable Long id,
-            @RequestParam String status
-    ) {
+    public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestParam String status) {
         orderService.updateStatus(id, status);
-        return "Status updated";
+        return ResponseEntity.ok(Map.of("message", "Status updated"));
     }
+
 }
