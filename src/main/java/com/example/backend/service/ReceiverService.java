@@ -1,10 +1,14 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.*;
-import com.example.backend.entity.*;
+import com.example.backend.dto.ReceiverCreateRequest;
+import com.example.backend.dto.ReceiverResponse;
+import com.example.backend.entity.Receiver;
+import com.example.backend.entity.User;
 import com.example.backend.repository.ReceiverRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -16,7 +20,6 @@ public class ReceiverService {
     private final UserService userService;
 
     public ReceiverResponse create(ReceiverCreateRequest req) {
-
         User user = userService.getCurrentUser();
 
         Receiver receiver = new Receiver();
@@ -39,9 +42,21 @@ public class ReceiverService {
                 .toList();
     }
 
-    public Receiver getById(Long id) {
-        return receiverRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+    public void delete(Long receiverId) {
+        User user = userService.getCurrentUser();
+
+        Receiver r = receiverRepo.findById(receiverId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Receiver not found"));
+
+        boolean active = Boolean.TRUE.equals(r.isActive()); // agar Boolean bo‘lsa
+        // agar entity’da primitive boolean bo‘lsa: boolean active = r.isActive();
+
+        if (!active || !r.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Receiver not allowed");
+        }
+
+        r.setActive(false);
+        receiverRepo.save(r);
     }
 
     private ReceiverResponse map(Receiver r) {
@@ -51,16 +66,4 @@ public class ReceiverService {
                 r.getPhone()
         );
     }
-
-    public Receiver getOwnedByCurrentUser(Long receiverId) {
-        User user = userService.getCurrentUser();
-        Receiver r = receiverRepo.findById(receiverId)
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
-
-        if (!r.isActive() || !r.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Receiver not allowed");
-        }
-        return r;
-    }
-
 }

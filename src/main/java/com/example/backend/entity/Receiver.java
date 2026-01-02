@@ -34,6 +34,7 @@ public class Receiver {
     @Column(nullable = false)
     private boolean active = true;
 
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

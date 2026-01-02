@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface ReceiverRepository extends JpaRepository<Receiver, Long> {
     List<Receiver> findByUserIdAndActiveTrue(Long userId);
+
 }
