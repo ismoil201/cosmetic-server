@@ -36,6 +36,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("update Product p set p.isTodayDeal = false where p.isTodayDeal = true")
     void clearTodayDeals();
 
+    Page<Product> findByCategoryAndActiveTrueOrderByCreatedAtDesc(Category category, Pageable pageable);
+
     List<Product> findByIsTodayDealTrueAndActiveTrue();
 
     // HIT (bugun xit)

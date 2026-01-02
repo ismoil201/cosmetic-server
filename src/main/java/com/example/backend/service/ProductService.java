@@ -209,6 +209,12 @@ public class ProductService {
         saveDetailImages(product, req.getDetailImages());   // ✅ qo‘shildi
     }
 
+    public Page<ProductCardResponse> getByCategoryCards(Category category, Pageable pageable) {
+        User user = userService.getCurrentUserOrNull();
+        return productRepo.findByCategoryAndActiveTrueOrderByCreatedAtDesc(category, pageable)
+                .map(p -> toCardPublic(p, user));   // shu yerda mainImageUrl chiqadi
+    }
+
 
     public List<ProductResponse> getProductsByIds(List<Long> ids) {
 

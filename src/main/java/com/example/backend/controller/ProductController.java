@@ -1,8 +1,10 @@
 package com.example.backend.controller;
 
+import com.example.backend.dto.ProductCardResponse;
 import com.example.backend.dto.ProductCreateRequest;
 import com.example.backend.dto.ProductDetailResponse;
 import com.example.backend.dto.ProductResponse;
+import com.example.backend.entity.Category;
 import com.example.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -36,6 +38,15 @@ public class ProductController {
     @GetMapping("/{id}")
     public ProductDetailResponse detail(@PathVariable Long id) {
         return productService.getDetail(id);
+    }
+
+    @GetMapping("/category")
+    public Page<ProductCardResponse> byCategory(
+            @RequestParam String category,
+            Pageable pageable
+    ) {
+        Category cat = Category.valueOf(category.toUpperCase());
+        return productService.getByCategoryCards(cat, pageable);
     }
 
 
