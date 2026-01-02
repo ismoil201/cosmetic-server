@@ -63,7 +63,6 @@ public class OrderService {
 
         orderStatusHistoryService.log(order, OrderStatus.PENDING);
 
-
         BigDecimal total = BigDecimal.ZERO;
 
         for (CartItem c : cartItems) {
@@ -71,9 +70,7 @@ public class OrderService {
             Product product = c.getProduct();
 
             if (product.getStock() < c.getQuantity()) {
-                throw new RuntimeException(
-                        "Not enough stock for product: " + product.getName()
-                );
+                throw new RuntimeException("Not enough stock for product: " + product.getName());
             }
 
             product.setStock(product.getStock() - c.getQuantity());
@@ -84,6 +81,10 @@ public class OrderService {
                             && product.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0
                             ? product.getDiscountPrice()
                             : product.getPrice();
+
+            // ✅ total hisobla
+            BigDecimal lineTotal = price.multiply(BigDecimal.valueOf(c.getQuantity()));
+            total = total.add(lineTotal);
 
             OrderItem item = new OrderItem();
             item.setOrder(order);
@@ -96,6 +97,7 @@ public class OrderService {
 
         order.setTotalAmount(total);
         orderRepo.save(order);
+
 
         cartRepo.deleteByUserId(user.getId());
 
