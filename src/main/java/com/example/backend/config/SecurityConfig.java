@@ -38,11 +38,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/products/**").permitAll()
                         .requestMatchers("/api/reviews/product/**").permitAll()
 
+                        // ✅ BANNERS (PUBLIC)
+                        .requestMatchers("/api/banners/**").permitAll()
+
                         .requestMatchers("/error").permitAll()
 
                         .anyRequest().authenticated()
                 )
-
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
