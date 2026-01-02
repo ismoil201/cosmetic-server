@@ -34,6 +34,10 @@ public class Address {
     @Column(nullable = false)
     private boolean active = true;
 
+
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

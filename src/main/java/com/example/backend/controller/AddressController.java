@@ -7,7 +7,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
 @RestController
 @RequestMapping("/api/addresses")
 @RequiredArgsConstructor
@@ -25,4 +24,11 @@ public class AddressController {
     public List<AddressResponse> myAddresses() {
         return addressService.myAddresses();
     }
+
+    @DeleteMapping("/{id}")
+    public SimpleResponse delete(@PathVariable Long id) {
+        addressService.delete(id);
+        return new SimpleResponse(true, "Deleted", null);
+    }
 }
+
