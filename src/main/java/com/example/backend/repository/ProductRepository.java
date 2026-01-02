@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -62,6 +63,72 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 """)
     Page<Product> findDiscounted(Pageable pageable);
 
+
+    // ✅ Hits (Today deal) - shuffled + exclude
+    @Query(value = """
+      SELECT * FROM products p
+      WHERE p.active = 1
+        AND p.is_today_deal = 1
+        AND (:excludeEmpty = 1 OR p.id NOT IN (:excludeIds))
+      ORDER BY CRC32(CONCAT(p.id, :seed))
+      LIMIT :limit
+    """, nativeQuery = true)
+    List<Product> hitsShuffledExclude(
+            @Param("seed") String seed,
+            @Param("excludeIds") List<Long> excludeIds,
+            @Param("excludeEmpty") int excludeEmpty,
+            @Param("limit") int limit
+    );
+
+    // ✅ Discounts - haqiqiy discount + shuffled + exclude
+    @Query(value = """
+      SELECT * FROM products p
+      WHERE p.active = 1
+        AND p.discount_price IS NOT NULL
+        AND p.discount_price < p.price
+        AND (:excludeEmpty = 1 OR p.id NOT IN (:excludeIds))
+      ORDER BY CRC32(CONCAT(p.id, :seed))
+      LIMIT :limit
+    """, nativeQuery = true)
+    List<Product> discountsShuffledExclude(
+            @Param("seed") String seed,
+            @Param("excludeIds") List<Long> excludeIds,
+            @Param("excludeEmpty") int excludeEmpty,
+            @Param("limit") int limit
+    );
+
+    // ✅ New Arrivals - created_at DESC + tie-breaker + exclude
+    @Query(value = """
+      SELECT * FROM products p
+      WHERE p.active = 1
+        AND (:excludeEmpty = 1 OR p.id NOT IN (:excludeIds))
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT :limit
+    """, nativeQuery = true)
+    List<Product> newArrivalsExclude(
+            @Param("excludeIds") List<Long> excludeIds,
+            @Param("excludeEmpty") int excludeEmpty,
+            @Param("limit") int limit
+    );
+
+    // ✅ Popular - sold_count DESC + tie-breaker + exclude + pagination
+    @Query(value = """
+      SELECT * FROM products p
+      WHERE p.active = 1
+        AND (:excludeEmpty = 1 OR p.id NOT IN (:excludeIds))
+      ORDER BY p.sold_count DESC, p.view_count DESC, p.id DESC
+    """,
+            countQuery = """
+      SELECT COUNT(*) FROM products p
+      WHERE p.active = 1
+        AND (:excludeEmpty = 1 OR p.id NOT IN (:excludeIds))
+    """,
+            nativeQuery = true)
+    Page<Product> popularExclude(
+            @Param("excludeIds") List<Long> excludeIds,
+            @Param("excludeEmpty") int excludeEmpty,
+            Pageable pageable
+    );
 
 
     @Query("""

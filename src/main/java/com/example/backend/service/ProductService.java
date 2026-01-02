@@ -335,6 +335,12 @@ public class ProductService {
             detailImageRepo.save(img);
         }
     }
+    // ProductService ichida
+
+    public ProductCardResponse toCardPublic(Product p, User user) {
+        return toCard(p, user);
+    }
+
 
 
     private void map(ProductCreateRequest req, Product p) {

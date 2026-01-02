@@ -1,6 +1,7 @@
 package com.example.backend.controller;
 
 import com.example.backend.dto.HomeResponse;
+import com.example.backend.service.HomeService;
 import com.example.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -14,27 +15,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class HomeController {
 
-    private final ProductService productService;
-    /**
-     * HOME PAGE API:
-     * - hits (bugun xit)
-     * - discounts (chegirmalar)
-     * - newArrivals (yangi kelganlar)
-     * - popular (grid/pagination)
-     *
-     * Example:
-     * /api/home?limit=10&page=0&size=20
-     */
+    private final HomeService homeService;
+
     @GetMapping
     public HomeResponse home(
             @RequestParam(defaultValue = "10") int limit,
-            Pageable pageable // popular grid uchun
+            @RequestParam(required = false) String seed,
+            Pageable pageable
     ) {
-        return new HomeResponse(
-                productService.getHits(limit),
-                productService.getDiscounts(limit),
-                productService.getNewArrivals(limit),
-                productService.getPopular(pageable)
-        );
+        if (seed == null || seed.isBlank()) {
+            // seed bo‘lmasa ham ishlasin
+            seed = String.valueOf(System.currentTimeMillis());
+        }
+        return homeService.home(limit, pageable, seed);
     }
 }
