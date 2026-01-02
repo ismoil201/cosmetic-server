@@ -341,6 +341,34 @@ public class ProductService {
         return toCard(p, user);
     }
 
+    private ProductCardResponse toCard(Product p, User user) {
+        boolean favorite = (user != null) && favRepo.existsByUserAndProduct(user, p);
+
+        String mainImage = productImageRepo
+                .findFirstByProductIdAndMainTrue(p.getId())
+                .map(ProductImage::getImageUrl)
+                .orElseGet(() -> productImageRepo
+                        .findFirstByProductIdOrderByIdAsc(p.getId())
+                        .map(ProductImage::getImageUrl)
+                        .orElse(null)
+                );
+
+        return new ProductCardResponse(
+                p.getId(),
+                p.getName(),
+                p.getBrand(),
+                p.getPrice(),
+                p.getDiscountPrice(),
+                p.getCategory(),
+                p.getRatingAvg(),
+                p.getReviewCount(),
+                p.getSoldCount(),
+                p.isTodayDeal(),
+                favorite,
+                p.getStock(),
+                mainImage
+        );
+    }
 
 
     private void map(ProductCreateRequest req, Product p) {
