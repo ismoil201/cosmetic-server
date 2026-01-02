@@ -41,7 +41,8 @@ public class HomeService {
         var newArrivals = newP.stream().map(p -> productServiceToCard(p, user)).toList();
 
         // 4) Popular (page)
-        Page<Product> popP = productRepo.popularExclude(used, used.isEmpty()?1:0, pageable);
+        // 4) Popular (page) - EXCLUDE QILMAYMIZ ✅
+        Page<Product> popP = productRepo.findByActiveTrueOrderBySoldCountDesc(pageable);
         var popular = popP.map(p -> productServiceToCard(p, user));
 
         return new HomeResponse(hits, discounts, newArrivals, popular);
