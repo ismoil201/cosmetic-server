@@ -58,6 +58,30 @@ public class ReceiverService {
         r.setActive(false);
         receiverRepo.save(r);
     }
+    public Receiver getOwnedByCurrentUser(Long receiverId) {
+
+        User user = userService.getCurrentUser();
+
+        Receiver r = receiverRepo.findById(receiverId)
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Receiver not found"
+                        )
+                );
+
+        boolean active = Boolean.TRUE.equals(r.isActive());
+        // agar primitive boolean bo‘lsa → r.isActive()
+
+        if (!active || !r.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Receiver not allowed"
+            );
+        }
+
+        return r;
+    }
 
     private ReceiverResponse map(Receiver r) {
         return new ReceiverResponse(
