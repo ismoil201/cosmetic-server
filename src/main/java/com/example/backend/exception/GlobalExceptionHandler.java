@@ -39,4 +39,9 @@ public class GlobalExceptionHandler {
                         "message", e.getMessage()
                 ));
     }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiResponse<?>> handle(RuntimeException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+    }
 }

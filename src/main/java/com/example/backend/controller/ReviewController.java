@@ -38,8 +38,9 @@ public class ReviewController {
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/my")
-    public List<MyReviewKeyResponse> my() {
-        return reviewService.getMyReviewKeys();
+    public ResponseEntity<ApiResponse<List<MyReviewKeyResponse>>> my() {
+        return ResponseEntity.ok(ApiResponse.ok(reviewService.getMyReviewKeys()));
     }
+
 
 }
