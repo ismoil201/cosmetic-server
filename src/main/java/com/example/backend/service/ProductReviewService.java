@@ -1,5 +1,6 @@
 package com.example.backend.service;
 
+import com.example.backend.dto.MyReviewKeyResponse;
 import com.example.backend.dto.ReviewCreateRequest;
 import com.example.backend.dto.ReviewResponse;
 import com.example.backend.entity.*;
@@ -51,9 +52,11 @@ public class ProductReviewService {
         }
 
         // ❌ Bir marta review
-        if (reviewRepo.existsByUserAndProduct(user, product)) {
-            throw new RuntimeException("You already reviewed this product");
+        // ✅ Bir order uchun 1 marta review
+        if (reviewRepo.existsByUserAndProductAndOrder(user, product, order)) {
+            throw new RuntimeException("You already reviewed this product for this order");
         }
+
 
         // 1️⃣ Review saqlash
         ProductReview review = new ProductReview();
@@ -116,5 +119,19 @@ public class ProductReviewService {
                 })
                 .toList();
     }
+
+    @Transactional(readOnly = true)
+    public List<MyReviewKeyResponse> getMyReviewKeys() {
+        User user = userService.getCurrentUser();
+        return reviewRepo.findByUserId(user.getId())
+                .stream()
+                .map(r -> new MyReviewKeyResponse(
+                        r.getOrder().getId(),
+                        r.getProduct().getId()
+                ))
+                .toList();
+    }
+
+
 
 }

@@ -1,5 +1,6 @@
 package com.example.backend.repository;
 
+import com.example.backend.entity.Order;
 import com.example.backend.entity.Product;
 import com.example.backend.entity.ProductReview;
 import com.example.backend.entity.User;
@@ -14,5 +15,9 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, Lo
     boolean existsByUserAndProduct(User user, Product product);
 
     List<ProductReview> findByProductId(Long productId);
+
+    boolean existsByUserAndProductAndOrder(User user, Product product, Order order);
+    List<ProductReview> findByUserId(Long userId);
+
 
 }

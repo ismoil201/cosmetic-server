@@ -1,5 +1,7 @@
 package com.example.backend.controller;
 
+import com.example.backend.dto.ApiResponse;
+import com.example.backend.dto.MyReviewKeyResponse;
 import com.example.backend.dto.ReviewCreateRequest;
 import com.example.backend.dto.ReviewResponse;
 import com.example.backend.service.ProductReviewService;
@@ -20,14 +22,24 @@ public class ReviewController {
     // 🔐 REVIEW YOZISH (faqat login qilingan user)
     @PreAuthorize("isAuthenticated()")
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody ReviewCreateRequest req) {
+    public ResponseEntity<ApiResponse<?>> create(@RequestBody ReviewCreateRequest req) {
         reviewService.create(req);
-        return ResponseEntity.ok("Review created");
+        return ResponseEntity.ok(ApiResponse.okMessage("Review created"));
     }
+
 
     // 🔓 PRODUCT REVIEW LIST (public)
     @GetMapping("/product/{productId}")
     public List<ReviewResponse> byProduct(@PathVariable Long productId) {
         return reviewService.getByProduct(productId);
+
+
     }
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/my")
+    public List<MyReviewKeyResponse> my() {
+        return reviewService.getMyReviewKeys();
+    }
+
 }
