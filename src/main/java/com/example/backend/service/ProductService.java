@@ -274,6 +274,14 @@ public class ProductService {
     private ProductCardResponse toCard(Product p, User user) {
         boolean favorite = (user != null) && favRepo.existsByUserAndProduct(user, p);
 
+        // ✅ list (slider uchun)
+        List<ProductImageResponse> images = productImageRepo
+                .findByProductIdOrderByMainDescIdAsc(p.getId())
+                .stream()
+                .map(img -> new ProductImageResponse(img.getImageUrl(), img.isMain()))
+                .toList();
+
+        // ✅ main (fallback bilan)
         ProductImageResponse mainImage = productImageRepo
                 .findFirstByProductIdAndMainTrue(p.getId())
                 .or(() -> productImageRepo.findFirstByProductIdOrderByIdAsc(p.getId()))
@@ -293,7 +301,8 @@ public class ProductService {
                 p.isTodayDeal(),
                 favorite,
                 p.getStock(),
-                mainImage
+                mainImage,
+                images
         );
     }
 

@@ -25,6 +25,10 @@ public class ProductCardResponse {
     private boolean isTodayDeal;
     private boolean favorite;
     private int stock;
+
+    // ✅ bitta main ham qolsin (xohlasangiz)
     private ProductImageResponse mainImageUrl;
 
+    // ✅ HOME uchun sliderga kerak bo‘ladigan list
+    private List<ProductImageResponse> images;
 }
