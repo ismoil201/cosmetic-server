@@ -274,9 +274,10 @@ public class ProductService {
     private ProductCardResponse toCard(Product p, User user) {
         boolean favorite = (user != null) && favRepo.existsByUserAndProduct(user, p);
 
-        String mainImage = productImageRepo
+        ProductImageResponse mainImage = productImageRepo
                 .findFirstByProductIdAndMainTrue(p.getId())
-                .map(ProductImage::getImageUrl)
+                .or(() -> productImageRepo.findFirstByProductIdOrderByIdAsc(p.getId()))
+                .map(img -> new ProductImageResponse(img.getImageUrl(), img.isMain()))
                 .orElse(null);
 
         return new ProductCardResponse(
@@ -295,6 +296,7 @@ public class ProductService {
                 mainImage
         );
     }
+
 
     public Page<ProductCardResponse> getPopular(Pageable pageable) {
         User user = userService.getCurrentUserOrNull();

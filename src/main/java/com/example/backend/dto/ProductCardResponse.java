@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -24,6 +25,6 @@ public class ProductCardResponse {
     private boolean isTodayDeal;
     private boolean favorite;
     private int stock;
+    private ProductImageResponse mainImageUrl;
 
-    private String mainImageUrl; // 🔥 faqat bitta rasm
 }
