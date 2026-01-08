@@ -24,7 +24,7 @@ public class ProductService {
     private final ProductImageRepository productImageRepo;
     private final ProductDetailImageRepository detailImageRepo;
 
-    private SearchLogRepository searchLogRepo;
+    private final SearchLogRepository searchLogRepo;
     /* ================= CREATE ================= */
 
     @Transactional
