@@ -8,6 +8,7 @@ import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -361,26 +362,77 @@ public class ProductService {
 
 
     public Page<ProductCardResponse> search(String q, Pageable pageable) {
-        User user = userService.getCurrentUserOrNull();
 
-        return productRepo.searchPublic(q, pageable)
-                .map(p -> toCardPublic(p, user));
+        User user = userService.getCurrentUserOrNull();
+        String query = (q == null) ? "" : q.trim().toLowerCase();
+
+        Page<Product> page = productRepo.fuzzySearch(query, pageable);
+
+        List<Product> sortedProducts = page.getContent().stream()
+                .sorted((a, b) -> {
+                    int d1 = levenshtein(nullSafe(a.getSearchText()), query);
+                    int d2 = levenshtein(nullSafe(b.getSearchText()), query);
+                    if (d1 != d2) return Integer.compare(d1, d2);
+
+                    int s1 = a.getSoldCount() * 3 + a.getViewCount();
+                    int s2 = b.getSoldCount() * 3 + b.getViewCount();
+                    return Integer.compare(s2, s1);
+                })
+                .toList();
+
+        List<ProductCardResponse> cards = sortedProducts.stream()
+                .map(p -> toCardPublic(p, user))
+                .toList();
+
+        return new PageImpl<>(cards, pageable, page.getTotalElements());
     }
 
+    private String nullSafe(String s) {
+        return s == null ? "" : s;
+    }
+
+
+    private int levenshtein(String a, String b) {
+        a = a.toLowerCase();
+        b = b.toLowerCase();
+
+        int[] costs = new int[b.length() + 1];
+        for (int j = 0; j < costs.length; j++) costs[j] = j;
+
+        for (int i = 1; i <= a.length(); i++) {
+            costs[0] = i;
+            int nw = i - 1;
+            for (int j = 1; j <= b.length(); j++) {
+                int cj = Math.min(
+                        1 + Math.min(costs[j], costs[j - 1]),
+                        a.charAt(i - 1) == b.charAt(j - 1) ? nw : nw + 1
+                );
+                nw = costs[j];
+                costs[j] = cj;
+            }
+        }
+        return costs[b.length()];
+    }
 
 
     private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());
-        p.setDescription(req.getDescription());
         p.setBrand(req.getBrand());
+        p.setDescription(req.getDescription());
         p.setPrice(req.getPrice());
         p.setDiscountPrice(req.getDiscountPrice());
         p.setStock(req.getStock());
 
-        try {
-            p.setCategory(Category.valueOf(req.getCategory().toUpperCase()));
-        } catch (Exception e) {
-            throw new RuntimeException("Invalid category");
-        }
+        Category cat = Category.valueOf(req.getCategory().toUpperCase());
+        p.setCategory(cat);
+
+        // 🔥 MUSINSA STYLE SEARCH TEXT
+        p.setSearchText(
+                (req.getName() + " " +
+                        req.getBrand() + " " +
+                        cat.name())
+                        .toLowerCase()
+        );
     }
+
 }

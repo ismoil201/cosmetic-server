@@ -165,5 +165,31 @@ where p.active = true
             Pageable pageable
     );
 
+    @Query(value = """
+SELECT * FROM products p
+WHERE p.active = 1
+  AND (
+       p.search_text LIKE CONCAT('%', :q, '%')
+    OR SOUNDEX(p.search_text) = SOUNDEX(:q)
+  )
+ORDER BY
+  (p.sold_count * 3 + p.view_count) DESC,
+  p.created_at DESC
+""",
+            countQuery = """
+SELECT COUNT(*) FROM products p
+WHERE p.active = 1
+  AND (
+       p.search_text LIKE CONCAT('%', :q, '%')
+    OR SOUNDEX(p.search_text) = SOUNDEX(:q)
+  )
+""",
+            nativeQuery = true)
+    Page<Product> fuzzySearch(
+            @Param("q") String q,
+            Pageable pageable
+    );
+
+
 
 }

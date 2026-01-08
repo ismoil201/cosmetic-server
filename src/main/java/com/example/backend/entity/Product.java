@@ -56,6 +56,10 @@ public class Product {
     @Column(name = "is_today_deal")
     private boolean isTodayDeal = false;
 
+    @Column(name = "search_text", length = 500)
+    private String searchText;
+
+
     // 🔥 OPTIMISTIC LOCKING (ENG MUHIM QATOR)
     @Version
     private Long version;
