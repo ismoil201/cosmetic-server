@@ -360,6 +360,14 @@ public class ProductService {
 
 
 
+    public Page<ProductCardResponse> search(String q, Pageable pageable) {
+        User user = userService.getCurrentUserOrNull();
+
+        return productRepo.searchPublic(q, pageable)
+                .map(p -> toCardPublic(p, user));
+    }
+
+
 
     private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());

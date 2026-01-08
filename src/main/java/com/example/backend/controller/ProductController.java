@@ -94,6 +94,14 @@ public class ProductController {
         return ResponseEntity.ok("Updated");
     }
 
+    @GetMapping("/search")
+    public Page<ProductCardResponse> search(
+            @RequestParam String q,
+            Pageable pageable
+    ) {
+        return productService.search(q, pageable);
+    }
+
     // 🔐 ADMIN
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")

@@ -151,4 +151,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             Pageable pageable
     );
 
+    @Query("""
+select p from Product p
+where p.active = true
+  and (
+       lower(p.name) like lower(concat('%', :q, '%'))
+    or lower(p.brand) like lower(concat('%', :q, '%'))
+    or lower(p.category) like lower(concat('%', :q, '%'))
+  )
+""")
+    Page<Product> searchPublic(
+            @Param("q") String q,
+            Pageable pageable
+    );
+
+
 }
