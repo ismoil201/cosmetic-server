@@ -1,18 +1,19 @@
 package com.example.backend.controller;
 
-import com.example.backend.dto.ProductCardResponse;
-import com.example.backend.dto.ProductCreateRequest;
-import com.example.backend.dto.ProductDetailResponse;
-import com.example.backend.dto.ProductResponse;
+import com.example.backend.dto.*;
 import com.example.backend.entity.Category;
+import com.example.backend.entity.SearchLog;
+import com.example.backend.repository.SearchLogRepository;
 import com.example.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -21,6 +22,7 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    private  final SearchLogRepository  searchLogRepository;
     /**
      * PUBLIC: Product list (pagination)
      * Example: /api/products?page=0&size=20
@@ -109,6 +111,31 @@ public class ProductController {
         productService.delete(id);
         return ResponseEntity.ok("Deleted");
     }
+    @GetMapping("/admin/search/top")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<SearchStatResponse> topSearches() {
+
+        return searchLogRepository
+                .topKeywords(LocalDateTime.now().minusDays(7), PageRequest.of(0, 20))
+                .stream()
+                .map(r -> new SearchStatResponse(
+                        (String) r[0],
+                        ((Long) r[1]).intValue()
+                ))
+                .toList();
+    }
+
+    @GetMapping("/admin/search/empty")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<String> emptySearches() {
+
+        return searchLogRepository.findTop20ByResultCountOrderByCreatedAtDesc(0)
+                .stream()
+                .map(SearchLog::getKeyword)
+                .toList();
+    }
+
+
 
 
 }

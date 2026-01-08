@@ -1,12 +1,11 @@
 package com.example.backend.service;
 
+import com.example.backend.SearchNormalizer;
 import com.example.backend.dto.*;
 import com.example.backend.entity.*;
-import com.example.backend.repository.FavoriteRepository;
-import com.example.backend.repository.ProductDetailImageRepository;
-import com.example.backend.repository.ProductImageRepository;
-import com.example.backend.repository.ProductRepository;
+import com.example.backend.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -25,7 +24,7 @@ public class ProductService {
     private final ProductImageRepository productImageRepo;
     private final ProductDetailImageRepository detailImageRepo;
 
-
+    private SearchLogRepository searchLogRepo;
     /* ================= CREATE ================= */
 
     @Transactional
@@ -364,19 +363,31 @@ public class ProductService {
     public Page<ProductCardResponse> search(String q, Pageable pageable) {
 
         User user = userService.getCurrentUserOrNull();
-        String query = (q == null) ? "" : q.trim().toLowerCase();
 
-        Page<Product> page = productRepo.fuzzySearch(query, pageable);
+        String normalizedQuery = SearchNormalizer.normalize(q);
+
+        Page<Product> page = productRepo.fuzzySearch(normalizedQuery, pageable);
 
         List<Product> sortedProducts = page.getContent().stream()
                 .sorted((a, b) -> {
-                    int d1 = levenshtein(nullSafe(a.getSearchText()), query);
-                    int d2 = levenshtein(nullSafe(b.getSearchText()), query);
+
+                    String aText = nullSafe(a.getSearchText());
+                    String bText = nullSafe(b.getSearchText());
+
+                    int d1 = distance(aText, normalizedQuery);
+                    int d2 = distance(bText, normalizedQuery);
                     if (d1 != d2) return Integer.compare(d1, d2);
 
-                    int s1 = a.getSoldCount() * 3 + a.getViewCount();
-                    int s2 = b.getSoldCount() * 3 + b.getViewCount();
-                    return Integer.compare(s2, s1);
+                    boolean aBrand = a.getBrand() != null &&
+                            (normalizedQuery.contains(a.getBrand().toLowerCase()) || aText.contains(a.getBrand().toLowerCase()));
+                    boolean bBrand = b.getBrand() != null &&
+                            (normalizedQuery.contains(b.getBrand().toLowerCase()) || bText.contains(b.getBrand().toLowerCase()));
+
+                    if (aBrand != bBrand) return aBrand ? -1 : 1;
+
+                    int scoreA = a.getSoldCount() * 3 + a.getViewCount();
+                    int scoreB = b.getSoldCount() * 3 + b.getViewCount();
+                    return Integer.compare(scoreB, scoreA);
                 })
                 .toList();
 
@@ -384,12 +395,43 @@ public class ProductService {
                 .map(p -> toCardPublic(p, user))
                 .toList();
 
+        SearchLog log = new SearchLog();
+        log.setKeyword(q);
+        log.setNormalizedKeyword(normalizedQuery);
+        log.setResultCount(cards.size());
+        log.setUser(user);
+        searchLogRepo.save(log);
+
         return new PageImpl<>(cards, pageable, page.getTotalElements());
+    }
+
+    private int distance(String text, String query) {
+        if (text == null) text = "";
+        if (query == null) query = "";
+        text = text.trim().toLowerCase();
+        query = query.trim().toLowerCase();
+
+        if (text.isBlank() || query.isBlank()) return Integer.MAX_VALUE;
+
+        String[] textTokens = text.split("\\s+");
+        String[] qTokens = query.split("\\s+");
+
+        int sum = 0;
+        for (String qTok : qTokens) {
+            int min = Integer.MAX_VALUE;
+            for (String tTok : textTokens) {
+                min = Math.min(min, levenshtein(tTok, qTok));
+                if (min == 0) break;
+            }
+            sum += min;
+        }
+        return sum;
     }
 
     private String nullSafe(String s) {
         return s == null ? "" : s;
     }
+
 
 
     private int levenshtein(String a, String b) {
@@ -427,12 +469,16 @@ public class ProductService {
         p.setCategory(cat);
 
         // 🔥 MUSINSA STYLE SEARCH TEXT
-        p.setSearchText(
-                (req.getName() + " " +
+        String base =
+                req.getName() + " " +
                         req.getBrand() + " " +
-                        cat.name())
-                        .toLowerCase()
-        );
+                        cat.name();
+
+        String normalized = SearchNormalizer.normalize(base);
+
+// 🔥 DB ichida ham canonical tokenlar bo‘ladi
+        p.setSearchText((base + " " + normalized).toLowerCase());
+
     }
 
 }
