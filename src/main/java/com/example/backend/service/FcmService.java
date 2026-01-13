@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
-
 @Service
 @RequiredArgsConstructor
 public class FcmService {
@@ -30,19 +29,14 @@ public class FcmService {
             try {
                 Message message = Message.builder()
                         .setToken(t.getToken())
-                        .setNotification(
-                                Notification.builder()
-                                        .setTitle(title)
-                                        .setBody(body)
-                                        .build()
-                        )
+                        .putData("title", title)
+                        .putData("body", body)
                         .putAllData(data)
                         .build();
 
                 FirebaseMessaging.getInstance().send(message);
 
             } catch (Exception e) {
-                // ❌ token yaroqsiz → o‘chirib tashlaymiz
                 tokenRepo.deleteByToken(t.getToken());
             }
         }
