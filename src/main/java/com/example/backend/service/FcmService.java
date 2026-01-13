@@ -29,12 +29,23 @@ public class FcmService {
             try {
                 Message message = Message.builder()
                         .setToken(t.getToken())
-                        .putData("title", title)
-                        .putData("body", body)
-                        .putAllData(data)
+
+                        // 🔔 SYSTEM notification (ENG MUHIM)
+                        .setNotification(
+                                com.google.firebase.messaging.Notification.builder()
+                                        .setTitle(title)   // 👈 "Sansajr"
+                                        .setBody(body)     // 👈 "salom"
+                                        .build()
+                        )
+
+                        // 📦 DATA (ixtiyoriy)
+                        .putData("type", "ANNOUNCEMENT")
+                        .putData("refId", "123")
+
                         .build();
 
                 FirebaseMessaging.getInstance().send(message);
+
 
             } catch (Exception e) {
                 tokenRepo.deleteByToken(t.getToken());
