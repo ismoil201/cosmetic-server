@@ -40,8 +40,8 @@ public class Notification {
     private Long refId;
 
     // 👁 O‘qilganmi
-    @Column(nullable = false)
-    private boolean read = false;
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead = false;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -23,7 +23,6 @@ public class AdminAnnouncementService {
     private final AnnouncementRepository announcementRepo;
     private final UserRepository userRepo;
     private final NotificationRepository notificationRepo;
-    private final AnnouncementRepository repo;
     private final UserFcmTokenRepository tokenRepo;
 
 
@@ -42,13 +41,13 @@ public class AdminAnnouncementService {
         Page<Announcement> page;
 
         if (active != null && nt != null) {
-            page = repo.findByActiveAndType(active, nt, pageable);
+            page = announcementRepo.findByActiveAndType(active, nt, pageable);
         } else if (active != null) {
-            page = repo.findByActive(active, pageable);
+            page = announcementRepo.findByActive(active, pageable);
         } else if (nt != null) {
-            page = repo.findByType(nt, pageable);
+            page = announcementRepo.findByType(nt, pageable);
         } else {
-            page = repo.findAll(pageable);
+            page = announcementRepo.findAll(pageable);
         }
 
         return page.map(a -> new AdminAnnouncementResponse(
@@ -64,25 +63,25 @@ public class AdminAnnouncementService {
     // ================= SOFT DELETE =================
     @Transactional
     public void deactivate(Long id) {
-        Announcement a = repo.findById(id)
+        Announcement a = announcementRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Announcement not found"));
         a.setActive(false);
-        repo.save(a);
+        announcementRepo.save(a);
     }
 
     // ================= RESTORE =================
     @Transactional
     public void restore(Long id) {
-        Announcement a = repo.findById(id)
+        Announcement a = announcementRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Announcement not found"));
         a.setActive(true);
-        repo.save(a);
+        announcementRepo.save(a);
     }
 
     // ================= HARD DELETE (OPTIONAL) =================
     @Transactional
     public void delete(Long id) {
-        repo.deleteById(id);
+        announcementRepo.deleteById(id);
     }
     @Transactional
     public void publish(String title, String content, NotificationType type) {
