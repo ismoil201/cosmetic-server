@@ -24,6 +24,7 @@ public class Banner {
     @Column(name = "image_url", nullable = false, columnDefinition = "TEXT")
     private String imageUrl;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "link_type", nullable = false)
     private BannerLinkType linkType = BannerLinkType.NONE;

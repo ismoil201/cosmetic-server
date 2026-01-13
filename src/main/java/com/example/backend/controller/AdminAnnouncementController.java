@@ -4,6 +4,7 @@ import com.example.backend.dto.AdminAnnouncementResponse;
 import com.example.backend.dto.AnnouncementCreateRequest;
 import com.example.backend.service.AdminAnnouncementService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
