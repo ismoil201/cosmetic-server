@@ -30,18 +30,16 @@ public class FcmService {
                 Message message = Message.builder()
                         .setToken(t.getToken())
 
-                        // 🔔 SYSTEM notification (ENG MUHIM)
+                        // 🔴 SHU JOY ENG MUHIM
                         .setNotification(
-                                com.google.firebase.messaging.Notification.builder()
-                                        .setTitle(title)   // 👈 "Sansajr"
-                                        .setBody(body)     // 👈 "salom"
+                                Notification.builder()
+                                        .setTitle("Zaven")          // app nomi
+                                        .setBody("Yangi aksiya 🎉") // matn
                                         .build()
                         )
 
-                        // 📦 DATA (ixtiyoriy)
+                        // data optional (click handling uchun)
                         .putData("type", "ANNOUNCEMENT")
-                        .putData("refId", "123")
-
                         .build();
 
                 FirebaseMessaging.getInstance().send(message);
