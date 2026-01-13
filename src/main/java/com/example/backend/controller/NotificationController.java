@@ -74,7 +74,7 @@ public class NotificationController {
     @GetMapping("/unread-count")
     public long unreadCount() {
         User user = userService.getCurrentUser();
-        return notificationRepo.countByUserIdAndReadFalse(user.getId());
+        return notificationRepo.countByUserIdAndIsReadFalse(user.getId());
     }
 
 
