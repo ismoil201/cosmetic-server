@@ -45,12 +45,17 @@ public class NotificationController {
 
     @PostMapping("/{id}/read")
     public void markRead(@PathVariable Long id) {
+
+        User user = userService.getCurrentUser();
+
         Notification n = notificationRepo.findById(id)
-                .orElseThrow();
+                .filter(notif -> notif.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
 
         n.setRead(true);
         notificationRepo.save(n);
     }
+
 
     @PostMapping("/token")
     public void saveToken(@RequestBody FcmTokenRequest req) {
