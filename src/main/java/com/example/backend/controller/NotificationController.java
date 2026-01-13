@@ -66,5 +66,13 @@ public class NotificationController {
 
         tokenRepo.save(token);
     }
+    @GetMapping("/unread-count")
+    public long unreadCount() {
+        User user = userService.getCurrentUser();
+        return notificationRepo.countByUserIdAndReadFalse(user.getId());
+    }
+
+
+
 }
 
