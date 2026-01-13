@@ -7,7 +7,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "banners")
-@Getter @Setter
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -17,10 +18,7 @@ public class Banner {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(length = 255)
     private String title;
-
-    @Column(length = 255)
     private String subtitle;
 
     @Column(name = "image_url", nullable = false, columnDefinition = "TEXT")
@@ -33,18 +31,20 @@ public class Banner {
     @Column(name = "link_id")
     private Long linkId;
 
-    @Column(name = "position", nullable = false)
+    @Column(nullable = false)
     private Integer position = 0;
 
-    @Column(name = "active", nullable = false)
+    @Column(nullable = false)
     private Boolean active = true;
 
-    @Column(name = "start_at")
     private LocalDateTime startAt;
-
-    @Column(name = "end_at")
     private LocalDateTime endAt;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }
