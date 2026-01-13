@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -25,8 +26,10 @@ public class OrderService {
     private final ReceiverService receiverService;
     private final AddressService addressService;
     private final UserRepository userRepo;
+    private final NotificationService notificationService;
 
     private final OrderStatusHistoryService orderStatusHistoryService;
+    private  final FcmService  fcmService;
 
     /* ================= CREATE ORDER (CART → ORDER) ================= */
 
@@ -209,5 +212,36 @@ public class OrderService {
 
         orderStatusHistoryService.log(order, newStatus);
 
+
+        if (newStatus == OrderStatus.SHIPPED || newStatus == OrderStatus.DELIVERED) {
+
+            fcmService.sendToUser(
+                    order.getUser().getId(),
+                    newStatus == OrderStatus.SHIPPED
+                            ? "📦 Buyurtma jo‘natildi"
+                            : "✅ Buyurtma yetib bordi",
+                    newStatus == OrderStatus.SHIPPED
+                            ? "Buyurtmangiz kuryerga topshirildi"
+                            : "Xaridingiz yetkazildi",
+                    Map.of(
+                            "type", "ORDER",
+                            "orderId", order.getId().toString()
+                    )
+            );
+
+            notificationService.orderStatusChanged(
+                    order.getUser(),
+                    order,
+                    newStatus
+            );
+        }
+
+
+        // 🔔 NOTIFICATION
+        notificationService.orderStatusChanged(
+                order.getUser(),
+                order,
+                newStatus
+        );
     }
 }
