@@ -178,6 +178,9 @@ public final class SearchNormalizer {
         putSyn("suncream", "sunscreen");
         putSyn("sun", "sunscreen");
         putSyn("quyosh", "sunscreen");
+        putFix("axis-y", "axis y");
+        putFix("axisy", "axis y");
+        putFix("аксис", "axis"); // xohlasang
 
         // cushion / makeup
         putSyn("kushon", "cushion");

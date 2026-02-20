@@ -84,6 +84,11 @@ public class AdminProductController {
         return ResponseEntity.ok("Restored");
     }
 
+    @DeleteMapping("/{id}/hard")
+    public ResponseEntity<?> hardDelete(@PathVariable Long id) {
+        adminProductService.hardDelete(id);
+        return ResponseEntity.ok("Product permanently deleted");
+    }
     // 🔥 TODAY DEAL (BITTA)
     @PutMapping("/{id}/today-deal")
     public ResponseEntity<?> setTodayDeal(@PathVariable Long id) {

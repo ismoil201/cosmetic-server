@@ -24,6 +24,23 @@ public class AdminProductService {
 
 
     private final ProductImageRepository productImageRepository;
+
+
+
+    @Transactional
+    public void hardDelete(Long id) {
+
+        // avval product borligini tekshir
+        Product p = productRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        // avval rasmlarni o‘chir (FK bo‘lsa kerak!)
+        productImageRepo.deleteByProductId(id);
+        detailImageRepo.deleteByProductId(id);
+
+        // oxiri productni o‘chir
+        productRepo.delete(p);
+    }
     // ================= ADMIN LIST =================
     public Page<AdminProductResponse> list(
             Boolean active,
