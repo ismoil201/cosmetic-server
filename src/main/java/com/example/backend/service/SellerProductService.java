@@ -2,10 +2,7 @@ package com.example.backend.service;
 
 import com.example.backend.SearchNormalizer;
 import com.example.backend.dto.*;
-import com.example.backend.entity.Product;
-import com.example.backend.entity.ProductDetailImage;
-import com.example.backend.entity.ProductImage;
-import com.example.backend.entity.Seller;
+import com.example.backend.entity.*;
 import com.example.backend.repository.ProductDetailImageRepository;
 import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
