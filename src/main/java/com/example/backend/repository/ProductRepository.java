@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
@@ -133,6 +134,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             Pageable pageable
     );
 
+
+    Page<Product> findBySellerIdAndActiveTrueOrderByCreatedAtDesc(Long sellerId, Pageable pageable);
+
+    Optional<Product> findByIdAndSellerId(Long id, Long sellerId);
 
     @Query("""
     select p from Product p

@@ -1,10 +1,7 @@
 package com.example.backend.service;
 
 import com.example.backend.dto.*;
-import com.example.backend.entity.Category;
-import com.example.backend.entity.Product;
-import com.example.backend.entity.ProductDetailImage;
-import com.example.backend.entity.ProductImage;
+import com.example.backend.entity.*;
 import com.example.backend.repository.ProductDetailImageRepository;
 import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
@@ -18,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AdminProductService {
 
+
+    private final SellerService sellerService;
     private final ProductRepository productRepo;
     private final ProductImageRepository productImageRepo;
     private final ProductDetailImageRepository detailImageRepo;
@@ -124,8 +123,12 @@ public class AdminProductService {
 
         Product product = new Product();
         map(req, product);
-        productRepo.save(product);
 
+// 🔥 ADMIN PRODUCT → OFFICIAL SELLER
+        Seller official = sellerService.getOfficialSeller();
+        product.setSeller(official);
+
+        productRepo.save(product);
         saveImages(product, req);
         saveDetailImages(product, req); // 🔥 YANGI
 

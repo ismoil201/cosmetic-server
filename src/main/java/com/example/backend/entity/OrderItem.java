@@ -27,6 +27,11 @@ public class OrderItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    // 🔗 Marketplace: bu item qaysi seller_order ichida
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_order_id")
+    private SellerOrder sellerOrder;
+
     private int quantity;
 
     // 💰 SNAPSHOT PRICE (ENG MUHIM FIX)

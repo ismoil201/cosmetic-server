@@ -59,6 +59,10 @@ public class Product {
     @Column(name = "search_text", length = 500)
     private String searchText;
 
+    // 🔗 Marketplace: product qaysi sellerga tegishli
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id")
+    private Seller seller;
 
     // 🔥 OPTIMISTIC LOCKING (ENG MUHIM QATOR)
     @Version

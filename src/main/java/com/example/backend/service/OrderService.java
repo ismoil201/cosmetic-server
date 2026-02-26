@@ -21,6 +21,8 @@ public class OrderService {
     private final ProductRepository productRepo;
     private final ProductImageRepository productImageRepo;
     private final UserService userService;
+    private final SellerOrderRepository sellerOrderRepo;
+    private final SellerOrderStatusHistoryService sellerOrderHistoryService;
 
     // ✅ FINAL: receiver + address manbalari
     private final ReceiverService receiverService;
@@ -32,7 +34,6 @@ public class OrderService {
     private  final FcmService  fcmService;
 
     /* ================= CREATE ORDER (CART → ORDER) ================= */
-
     @Transactional
     public OrderResponse create(OrderCreateRequest req) {
 
@@ -42,18 +43,14 @@ public class OrderService {
         Address address = addressService.getOwnedByCurrentUser(req.getAddressId());
 
         List<CartItem> cartItems = cartRepo.findByUserId(user.getId());
-        if (cartItems.isEmpty()) {
-            throw new RuntimeException("Cart is empty");
-        }
+        if (cartItems.isEmpty()) throw new RuntimeException("Cart is empty");
 
+        // ================= MASTER ORDER =================
         Order order = new Order();
         order.setUser(user);
-
-        // 🔗 FK
         order.setReceiverId(receiver.getId());
         order.setAddressId(address.getId());
 
-        // 📸 SNAPSHOT
         order.setAddress(address.getAddress());
         order.setLatitude(address.getLatitude());
         order.setLongitude(address.getLongitude());
@@ -63,44 +60,78 @@ public class OrderService {
         order.setTotalAmount(BigDecimal.ZERO);
 
         order = orderRepo.save(order);
-
         orderStatusHistoryService.log(order, OrderStatus.PENDING);
 
-        BigDecimal total = BigDecimal.ZERO;
+        // ================= GROUP BY SELLER =================
+        Map<Seller, List<CartItem>> grouped =
+                cartItems.stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                c -> c.getProduct().getSeller()
+                        ));
 
-        for (CartItem c : cartItems) {
+        BigDecimal grandTotal = BigDecimal.ZERO;
 
-            Product product = c.getProduct();
+        // ================= EACH SELLER =================
+        for (Map.Entry<Seller, List<CartItem>> entry : grouped.entrySet()) {
 
-            if (product.getStock() < c.getQuantity()) {
-                throw new RuntimeException("Not enough stock for product: " + product.getName());
+            Seller seller = entry.getKey();
+            List<CartItem> items = entry.getValue();
+
+            SellerOrder sellerOrder = new SellerOrder();
+            sellerOrder.setOrder(order);
+            sellerOrder.setSeller(seller);
+            sellerOrder.setStatus(SellerOrder.SellerOrderStatus.NEW);
+            sellerOrder.setSubtotalAmount(BigDecimal.ZERO);
+            sellerOrder.setShippingFee(BigDecimal.ZERO);
+
+            sellerOrder = sellerOrderRepo.save(sellerOrder);
+
+            sellerOrderHistoryService.addHistory(
+                    sellerOrder,
+                    SellerOrder.SellerOrderStatus.NEW,
+                    user
+            );
+
+            BigDecimal sellerSubtotal = BigDecimal.ZERO;
+
+            for (CartItem c : items) {
+
+                Product product = c.getProduct();
+
+                if (product.getStock() < c.getQuantity()) {
+                    throw new RuntimeException("Not enough stock: " + product.getName());
+                }
+
+                product.setStock(product.getStock() - c.getQuantity());
+                productRepo.save(product);
+
+                BigDecimal price =
+                        product.getDiscountPrice() != null &&
+                                product.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0
+                                ? product.getDiscountPrice()
+                                : product.getPrice();
+
+                BigDecimal lineTotal = price.multiply(BigDecimal.valueOf(c.getQuantity()));
+                sellerSubtotal = sellerSubtotal.add(lineTotal);
+
+                OrderItem oi = new OrderItem();
+                oi.setOrder(order);
+                oi.setSellerOrder(sellerOrder);   // 🔥 MUHIM
+                oi.setProduct(product);
+                oi.setQuantity(c.getQuantity());
+                oi.setPrice(price);
+
+                orderItemRepo.save(oi);
             }
 
-            product.setStock(product.getStock() - c.getQuantity());
-            productRepo.save(product);
+            sellerOrder.setSubtotalAmount(sellerSubtotal);
+            sellerOrderRepo.save(sellerOrder);
 
-            BigDecimal price =
-                    product.getDiscountPrice() != null
-                            && product.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0
-                            ? product.getDiscountPrice()
-                            : product.getPrice();
-
-            // ✅ total hisobla
-            BigDecimal lineTotal = price.multiply(BigDecimal.valueOf(c.getQuantity()));
-            total = total.add(lineTotal);
-
-            OrderItem item = new OrderItem();
-            item.setOrder(order);
-            item.setProduct(product);
-            item.setQuantity(c.getQuantity());
-            item.setPrice(price);
-
-            orderItemRepo.save(item);
+            grandTotal = grandTotal.add(sellerSubtotal);
         }
 
-        order.setTotalAmount(total);
+        order.setTotalAmount(grandTotal);
         orderRepo.save(order);
-
 
         cartRepo.deleteByUserId(user.getId());
 

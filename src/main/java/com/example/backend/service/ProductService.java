@@ -36,6 +36,8 @@ public class ProductService {
 
         saveImages(product, req.getImageUrls());
         saveDetailImages(product, req.getDetailImages()); // ✅ qo‘shildi
+        Seller seller = sellerService.requireCurrentSeller();
+        product.setSeller(seller);
 
     }
 
