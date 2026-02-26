@@ -15,3 +15,13 @@ spring:
 
 server:
   port: ${PORT:8080}
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html   # foydalanuvchi shu bilan kiradi, u /swagger-ui/index.html ga redirect bo‘ladi
+    display-request-duration: true
+    operationsSorter: method
+    tagsSorter: alpha
+    docExpansion: none
+    disable-swagger-default-url: true

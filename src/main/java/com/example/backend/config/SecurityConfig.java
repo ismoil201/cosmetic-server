@@ -41,6 +41,11 @@ public class SecurityConfig {
                         // ✅ BANNERS (PUBLIC)
                         .requestMatchers("/api/banners/**").permitAll()
 
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html").permitAll()
+
                         .requestMatchers("/error").permitAll()
 
                         .anyRequest().authenticated()
