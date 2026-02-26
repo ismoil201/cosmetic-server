@@ -16,20 +16,20 @@ repositories {
 }
 
 dependencies {
-
-
-    //swagger
+    // Swagger (Boot 3.3.x bilan mos)
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
+
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
 
     // JWT
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
-    implementation("io.jsonwebtoken:jjwt-impl:0.11.5")
-    implementation("io.jsonwebtoken:jjwt-jackson:0.11.5")
-    implementation("com.google.firebase:firebase-admin:9.4.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
 
+    // Firebase Admin SDK
+    implementation("com.google.firebase:firebase-admin:9.4.3")
 
     // Lombok
     compileOnly("org.projectlombok:lombok")
@@ -38,7 +38,6 @@ dependencies {
     // MySQL
     runtimeOnly("com.mysql:mysql-connector-j:8.4.0")
 }
-
 tasks.withType<Test> {
     useJUnitPlatform()
 }
