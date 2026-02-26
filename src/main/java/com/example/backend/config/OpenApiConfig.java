@@ -43,7 +43,7 @@ public class OpenApiConfig {
                         .title("Zaven API")
                         .description("Zaven Marketplace Backend API (Spring Boot + JWT + OpenAPI)")
                         .version("v1")
-                        .contact(new Contact().name("Zaven Team").email("official@zaven.uz"))
+                        .contact(new Contact().name("Zaven Team").email("ismoiljoraxonov1@gmail.com"))
                         .license(new License().name("Proprietary")));
     }
 }

@@ -6,6 +6,7 @@ import com.example.backend.entity.SearchLog;
 import com.example.backend.repository.SearchLogRepository;
 import com.example.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,7 +30,7 @@ public class ProductController {
      */
     // 🔓 PUBLIC (TOKEN KERAK EMAS)
     @GetMapping
-    public Page<ProductResponse> list(Pageable pageable) {
+    public Page<ProductResponse> list(@ParameterObject Pageable pageable) {
         return productService.getHomeProducts(pageable);
     }
     /**
