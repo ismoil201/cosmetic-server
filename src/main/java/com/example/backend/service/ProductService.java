@@ -24,6 +24,7 @@ public class ProductService {
     private final ProductImageRepository productImageRepo;
     private final ProductDetailImageRepository detailImageRepo;
 
+    private final SellerService sellerService;
     private final SearchLogRepository searchLogRepo;
     /* ================= CREATE ================= */
 
