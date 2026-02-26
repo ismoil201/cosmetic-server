@@ -1,5 +1,8 @@
 package com.example.backend.controller;
 
+import com.example.backend.dto.ProductCreateRequest;
+import com.example.backend.dto.SellerProductDetailResponse;
+import com.example.backend.dto.SellerProductListResponse;
 import com.example.backend.entity.Product;
 import com.example.backend.service.SellerProductService;
 import lombok.RequiredArgsConstructor;

@@ -33,9 +33,11 @@ public class Banner {
     private Long linkId;
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer position = 0;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean active = true;
 
     private LocalDateTime startAt;

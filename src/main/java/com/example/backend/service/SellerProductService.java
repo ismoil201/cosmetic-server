@@ -125,7 +125,7 @@ public class SellerProductService {
     }
 
 
-    private SellerProductListResponse toListResponse(Product p) {
+    public SellerProductListResponse toListResponse(Product p) {
 
         String mainImageUrl = productImageRepo
                 .findFirstByProductIdAndMainTrue(p.getId())
@@ -150,7 +150,7 @@ public class SellerProductService {
     }
 
 
-    private SellerProductDetailResponse toDetailResponse(Product p) {
+    public SellerProductDetailResponse toDetailResponse(Product p) {
 
         List<ProductImageResponse> images =
                 productImageRepo.findByProductId(p.getId())
