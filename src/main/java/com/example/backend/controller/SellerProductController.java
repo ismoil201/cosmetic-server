@@ -19,7 +19,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 @SecurityRequirement(name = OpenApiConfig.SECURITY_SCHEME_NAME)
 @RestController
 @RequestMapping("/api/seller/products")
-@PreAuthorize("hasAuthority('SELLER')")
+@PreAuthorize("hasRole('SELLER')")
 @RequiredArgsConstructor
 public class SellerProductController {
 
