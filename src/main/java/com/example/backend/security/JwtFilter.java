@@ -6,7 +6,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -68,10 +70,15 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             String email = jwtService.extractEmail(token);
             String role = jwtService.extractRole(token);
-            if (role == null) role = "USER";
+            if (role == null || role.isBlank()) role = "USER";
+            role = role.toUpperCase();
+            if (role.startsWith("ROLE_")) role = role.substring(5);
 
-            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            Authentication existing = SecurityContextHolder.getContext().getAuthentication();
+            boolean missing = existing == null;
+            boolean anonymous = existing instanceof AnonymousAuthenticationToken;
 
+            if (missing || anonymous) {
                 UsernamePasswordAuthenticationToken authentication =
                         UsernamePasswordAuthenticationToken.authenticated(
                                 email,
@@ -79,10 +86,7 @@ public class JwtFilter extends OncePerRequestFilter {
                                 List.of(new SimpleGrantedAuthority("ROLE_" + role))
                         );
 
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
 
