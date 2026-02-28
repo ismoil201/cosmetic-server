@@ -10,7 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
+import org.springdoc.core.annotations.ParameterObject;
 @RestController
 @RequestMapping("/api/admin/products")
 @RequiredArgsConstructor
@@ -28,7 +28,7 @@ public class AdminProductController {
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) Boolean todayDeal,
             @RequestParam(required = false) String keyword,
-            Pageable pageable
+            @ParameterObject Pageable pageable
     ) {
         return adminProductService.list(
                 active, category, brand, todayDeal, keyword, pageable
