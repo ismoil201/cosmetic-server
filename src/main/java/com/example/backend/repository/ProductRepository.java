@@ -195,6 +195,47 @@ WHERE p.active = 1
             Pageable pageable
     );
 
+    @Query("""
+      select p from Product p
+      where p.active = true
+        and p.category in :cats
+        and (:excludeEmpty = true or p.id not in :exclude)
+      order by (p.soldCount * 3 + p.viewCount) desc, p.createdAt desc
+    """)
+    List<Product> candidatesByCategories(
+            @Param("cats") List<Category> cats,
+            @Param("exclude") List<Long> exclude,
+            @Param("excludeEmpty") boolean excludeEmpty,
+            Pageable pageable
+    );
 
+    @Query("""
+      select p from Product p
+      where p.active = true
+        and lower(p.brand) in :brands
+        and (:excludeEmpty = true or p.id not in :exclude)
+      order by (p.soldCount * 3 + p.viewCount) desc, p.createdAt desc
+    """)
+    List<Product> candidatesByBrands(
+            @Param("brands") List<String> brandsLower,
+            @Param("exclude") List<Long> exclude,
+            @Param("excludeEmpty") boolean excludeEmpty,
+            Pageable pageable
+    );
+
+    @Query("""
+      select p from Product p
+      where p.active = true
+        and p.discountPrice is not null
+        and p.discountPrice > 0
+        and p.discountPrice < p.price
+        and (:excludeEmpty = true or p.id not in :exclude)
+      order by ((p.price - p.discountPrice) / p.price) desc, (p.soldCount * 3 + p.viewCount) desc
+    """)
+    List<Product> discountedCandidates(
+            @Param("exclude") List<Long> exclude,
+            @Param("excludeEmpty") boolean excludeEmpty,
+            Pageable pageable
+    );
 
 }

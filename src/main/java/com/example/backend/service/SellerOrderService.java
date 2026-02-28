@@ -1,5 +1,6 @@
 package com.example.backend.service;
 
+import com.example.backend.entity.OrderStatus;
 import com.example.backend.entity.SellerOrder;
 import com.example.backend.entity.User;
 import com.example.backend.repository.SellerOrderRepository;
@@ -11,7 +12,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import static com.example.backend.entity.SellerOrder.SellerOrderStatus.CONFIRMED;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +33,7 @@ public class SellerOrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<SellerOrder> mySellerOrdersByStatus(SellerOrder.SellerOrderStatus status, Pageable pageable) {
+    public Page<SellerOrder> mySellerOrdersByStatus(OrderStatus status, Pageable pageable) {
         Long sellerId = sellerService.requireCurrentSellerId();
         return sellerOrderRepository.findBySellerIdAndStatusOrderByCreatedAtDesc(sellerId, status, pageable);
     }
@@ -57,7 +57,7 @@ public class SellerOrderService {
      * 2) seller_order_status_history insert
      * 3) (ixtiyoriy) master orders.status recalc
      */
-    public SellerOrder updateMySellerOrderStatus(Long sellerOrderId, SellerOrder.SellerOrderStatus newStatus) {
+    public SellerOrder updateMySellerOrderStatus(Long sellerOrderId, OrderStatus  newStatus) {
         SellerOrder so = getMySellerOrder(sellerOrderId);
 
         // status o'zgarish qoidasi (xohlasangiz kuchaytiramiz)
@@ -83,12 +83,12 @@ public class SellerOrderService {
         return saved;
     }
 
-    private void validateTransition(SellerOrder.SellerOrderStatus from, SellerOrder.SellerOrderStatus to) {
+    private void validateTransition(OrderStatus from, OrderStatus to) {
         if (from == to) return;
 
         // Minimal qoidalar:
         // CANCELED yoki DELIVERED bo'lsa, endi o'zgarmasin
-        if (from == SellerOrder.SellerOrderStatus.CANCELED || from == SellerOrder.SellerOrderStatus.DELIVERED) {
+        if (from == OrderStatus.CANCELED || from == OrderStatus.DELIVERED) {
             throw new IllegalStateException("Bu statusdan keyin o'zgartirib bo'lmaydi: " + from);
         }
 
@@ -98,19 +98,19 @@ public class SellerOrderService {
         // SHIPPED -> DELIVERED
         switch (from) {
             case NEW -> {
-                if (!(to == SellerOrder.SellerOrderStatus.CONFIRMED || to == SellerOrder.SellerOrderStatus.CANCELED))
+                if (!(to == OrderStatus.CONFIRMED || to == OrderStatus.CANCELED))
                     throw new IllegalStateException("NEW dan faqat CONFIRMED yoki CANCELED o'tadi");
             }
             case CONFIRMED -> {
-                if (!(to == SellerOrder.SellerOrderStatus.PACKED || to == SellerOrder.SellerOrderStatus.CANCELED))
+                if (!(to == OrderStatus.PACKED || to == OrderStatus.CANCELED))
                     throw new IllegalStateException("CONFIRMED dan faqat PACKED yoki CANCELED o'tadi");
             }
             case PACKED -> {
-                if (!(to == SellerOrder.SellerOrderStatus.SHIPPED || to == SellerOrder.SellerOrderStatus.CANCELED))
+                if (!(to == OrderStatus.SHIPPED || to == OrderStatus.CANCELED))
                     throw new IllegalStateException("PACKED dan faqat SHIPPED yoki CANCELED o'tadi");
             }
             case SHIPPED -> {
-                if (to != SellerOrder.SellerOrderStatus.DELIVERED)
+                if (to != OrderStatus.DELIVERED)
                     throw new IllegalStateException("SHIPPED dan faqat DELIVERED o'tadi");
             }
             default -> {

@@ -44,7 +44,7 @@ public class Order {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrderStatus status = OrderStatus.PENDING;
+    private OrderStatus status = OrderStatus.NEW;
 
     // 💰 MONEY
     @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)

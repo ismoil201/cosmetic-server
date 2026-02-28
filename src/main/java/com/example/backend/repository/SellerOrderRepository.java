@@ -1,5 +1,6 @@
 package com.example.backend.repository;
 
+import com.example.backend.entity.OrderStatus;
 import com.example.backend.entity.SellerOrder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,7 +17,7 @@ public interface SellerOrderRepository extends JpaRepository<SellerOrder, Long> 
     // Masalan: faqat NEW/CONFIRMED larni ko'rsatish
     Page<SellerOrder> findBySellerIdAndStatusOrderByCreatedAtDesc(
             Long sellerId,
-            SellerOrder.SellerOrderStatus status,
+            OrderStatus status,
             Pageable pageable
     );
 

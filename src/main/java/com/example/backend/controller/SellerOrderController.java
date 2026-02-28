@@ -2,6 +2,7 @@ package com.example.backend.controller;
 
 import com.example.backend.dto.SellerOrderDetailResponse;
 import com.example.backend.dto.SellerOrderListResponse;
+import com.example.backend.entity.OrderStatus;
 import com.example.backend.entity.SellerOrder;
 import com.example.backend.entity.SellerOrderStatusHistory;
 import com.example.backend.service.SellerOrderService;
@@ -34,7 +35,7 @@ public class SellerOrderController {
     // ================= BY STATUS =================
     @GetMapping("/status/{status}")
     public Page<SellerOrderListResponse> myOrdersByStatus(
-            @PathVariable SellerOrder.SellerOrderStatus status,
+            @PathVariable OrderStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
@@ -54,7 +55,7 @@ public class SellerOrderController {
     @PostMapping("/{id}/status")
     public SellerOrderDetailResponse updateStatus(
             @PathVariable Long id,
-            @RequestParam SellerOrder.SellerOrderStatus status
+            @RequestParam OrderStatus status
     ) {
         return SellerOrderDetailResponse.from(
                 sellerOrderService.updateMySellerOrderStatus(id, status)

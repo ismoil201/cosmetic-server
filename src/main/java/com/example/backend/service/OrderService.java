@@ -56,11 +56,11 @@ public class OrderService {
         order.setLongitude(address.getLongitude());
         order.setPhone(receiver.getPhone());
 
-        order.setStatus(OrderStatus.PENDING);
+        order.setStatus(OrderStatus.NEW);
         order.setTotalAmount(BigDecimal.ZERO);
 
         order = orderRepo.save(order);
-        orderStatusHistoryService.log(order, OrderStatus.PENDING);
+        orderStatusHistoryService.log(order, OrderStatus.NEW);
 
         // ================= GROUP BY SELLER =================
         Map<Seller, List<CartItem>> grouped =
@@ -80,7 +80,7 @@ public class OrderService {
             SellerOrder sellerOrder = new SellerOrder();
             sellerOrder.setOrder(order);
             sellerOrder.setSeller(seller);
-            sellerOrder.setStatus(SellerOrder.SellerOrderStatus.NEW);
+            sellerOrder.setStatus(OrderStatus.NEW);
             sellerOrder.setSubtotalAmount(BigDecimal.ZERO);
             sellerOrder.setShippingFee(BigDecimal.ZERO);
 
@@ -88,7 +88,7 @@ public class OrderService {
 
             sellerOrderHistoryService.addHistory(
                     sellerOrder,
-                    SellerOrder.SellerOrderStatus.NEW,
+                    OrderStatus.NEW,
                     user
             );
 
@@ -134,6 +134,20 @@ public class OrderService {
         orderRepo.save(order);
 
         cartRepo.deleteByUserId(user.getId());
+
+        BigDecimal FREE_SHIPPING_THRESHOLD = new BigDecimal("500000");
+        BigDecimal SHIPPING_FEE = new BigDecimal("30000");
+
+// grandTotal -> productlar summasi (siz hisoblagansiz)
+        BigDecimal finalTotal = grandTotal.compareTo(FREE_SHIPPING_THRESHOLD) < 0
+                ? grandTotal.add(SHIPPING_FEE)
+                : grandTotal;
+
+        order.setTotalAmount(finalTotal);
+        orderRepo.save(order);
+
+        cartRepo.deleteByUserId(user.getId());
+
 
         return detail(order.getId());
     }
@@ -215,7 +229,7 @@ public class OrderService {
         OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
 
         // 🔥 SOLD COUNT FAQAT PAID GA O‘TGANDA
-        if (order.getStatus() != OrderStatus.PAID && newStatus == OrderStatus.PAID) {
+        if (order.getStatus() != OrderStatus.CONFIRMED && newStatus == OrderStatus.CONFIRMED) {
 
             List<OrderItem> items = orderItemRepo.findByOrder(order);
 

@@ -1,5 +1,6 @@
 package com.example.backend.service;
 
+import com.example.backend.entity.OrderStatus;
 import com.example.backend.entity.SellerOrder;
 import com.example.backend.entity.SellerOrderStatusHistory;
 import com.example.backend.entity.User;
@@ -24,7 +25,7 @@ public class SellerOrderStatusHistoryService {
 
     public SellerOrderStatusHistory addHistory(
             SellerOrder sellerOrder,
-            SellerOrder.SellerOrderStatus newStatus,
+            OrderStatus newStatus,
             User changedByOrNull
     ) {
         SellerOrderStatusHistory h = new SellerOrderStatusHistory();

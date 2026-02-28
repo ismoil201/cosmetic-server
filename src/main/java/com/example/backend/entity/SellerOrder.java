@@ -38,7 +38,7 @@ public class SellerOrder {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private SellerOrderStatus status = SellerOrderStatus.NEW;
+    private OrderStatus status = OrderStatus.NEW;
 
     // itemlar summasi (shipping'siz)
     @Column(name = "subtotal_amount", nullable = false, precision = 15, scale = 2)
@@ -55,7 +55,5 @@ public class SellerOrder {
         createdAt = LocalDateTime.now();
     }
 
-    public enum SellerOrderStatus {
-        NEW, CONFIRMED, PACKED, SHIPPED, DELIVERED, CANCELED
-    }
+
 }

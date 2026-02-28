@@ -28,7 +28,7 @@ public class SellerOrderStatusHistory {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private SellerOrder.SellerOrderStatus status;
+    private OrderStatus status;
 
     // kim o'zgartirdi (seller user / admin)
     @ManyToOne(fetch = FetchType.LAZY)
