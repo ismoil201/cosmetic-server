@@ -12,6 +12,15 @@ import java.util.List;
 
 public interface EventLogRepository extends JpaRepository<EventLog, Long> {
 
+
+    default List<Object[]> impressionCounts(User user, LocalDateTime after) {
+        return countByProductAfter(user, EventType.IMPRESSION, after);
+    }
+
+    default List<Object[]> clickOrViewCounts(User user, LocalDateTime after) {
+        return countByProductAfterTypes(user, List.of(EventType.CLICK, EventType.VIEW), after);
+    }
+
     // oxirgi N kunda ko‘rilgan product ids
     @Query("""
       select distinct e.product.id

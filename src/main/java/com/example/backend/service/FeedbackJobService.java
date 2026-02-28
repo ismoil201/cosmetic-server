@@ -21,24 +21,31 @@ public class FeedbackJobService {
     private final ProductRepository productRepo;
     private final InterestService interestService;
 
+
     @Transactional
     public void applyNegativeFeedback(User user) {
 
         LocalDateTime after = LocalDateTime.now().minusHours(24);
 
-        // impressionCount map
+        // impressionCount map (masalan IMPRESSION eventType bo'lsa)
         Map<Long, Long> impr = new HashMap<>();
-        for (Object[] row : eventRepo.impressionCounts(user, after)) {
-            impr.put((Long) row[0], (Long) row[1]);
+        for (Object[] row : eventRepo.countByProductAfter(user, EventType.IMPRESSION, after)) {
+            Long productId = (Long) row[0];
+            Long count = (Long) row[1];
+            impr.put(productId, count);
         }
 
         // click/view count map
         Map<Long, Long> clk = new HashMap<>();
-        for (Object[] row : eventRepo.clickOrViewCounts(user, after)) {
-            clk.put((Long) row[0], (Long) row[1]);
+        var types = java.util.List.of(EventType.CLICK, EventType.VIEW);
+
+        for (Object[] row : eventRepo.countByProductAfterTypes(user, types, after)) {
+            Long productId = (Long) row[0];
+            Long count = (Long) row[1];
+            clk.put(productId, count);
         }
 
-        // penalize: impr >= 3 and click==0
+        // penalize: impr >= 3 and click/view == 0
         for (var entry : impr.entrySet()) {
             Long productId = entry.getKey();
             long imprCount = entry.getValue();
@@ -48,7 +55,6 @@ public class FeedbackJobService {
                 Product p = productRepo.findById(productId).orElse(null);
                 if (p == null) continue;
 
-                // kichik minus: user “bu yoqmayapti”
                 interestService.bump(user, InterestType.CATEGORY, p.getCategory().name(), -0.3);
                 if (p.getBrand() != null && !p.getBrand().isBlank()) {
                     interestService.bump(user, InterestType.BRAND, p.getBrand().trim().toLowerCase(), -0.2);
