@@ -1,5 +1,7 @@
 package com.example.backend.controller;
 
+import com.example.backend.dto.SellerOrderDetailResponse;
+import com.example.backend.dto.SellerOrderListResponse;
 import com.example.backend.entity.SellerOrder;
 import com.example.backend.entity.SellerOrderStatusHistory;
 import com.example.backend.service.SellerOrderService;
@@ -21,39 +23,42 @@ public class SellerOrderController {
 
     // ================= LIST =================
     @GetMapping
-    public Page<SellerOrder> myOrders(
+    public Page<SellerOrderListResponse> myOrders(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return sellerOrderService.mySellerOrders(PageRequest.of(page, size));
+        return sellerOrderService.mySellerOrders(PageRequest.of(page, size))
+                .map(SellerOrderListResponse::from);
     }
 
     // ================= BY STATUS =================
     @GetMapping("/status/{status}")
-    public Page<SellerOrder> myOrdersByStatus(
+    public Page<SellerOrderListResponse> myOrdersByStatus(
             @PathVariable SellerOrder.SellerOrderStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return sellerOrderService.mySellerOrdersByStatus(
-                status,
-                PageRequest.of(page, size)
-        );
+        return sellerOrderService.mySellerOrdersByStatus(status, PageRequest.of(page, size))
+                .map(SellerOrderListResponse::from);
     }
 
     // ================= DETAIL =================
     @GetMapping("/{id}")
-    public SellerOrder detail(@PathVariable Long id) {
-        return sellerOrderService.getMySellerOrder(id);
+    public SellerOrderDetailResponse detail(@PathVariable Long id) {
+        return SellerOrderDetailResponse.from(
+                sellerOrderService.getMySellerOrder(id)
+        );
     }
 
     // ================= UPDATE STATUS =================
     @PostMapping("/{id}/status")
-    public SellerOrder updateStatus(
+    public SellerOrderDetailResponse updateStatus(
             @PathVariable Long id,
             @RequestParam SellerOrder.SellerOrderStatus status
     ) {
-        return sellerOrderService.updateMySellerOrderStatus(id, status);
+        return SellerOrderDetailResponse.from(
+                sellerOrderService.updateMySellerOrderStatus(id, status)
+        );
     }
 
     // ================= HISTORY =================
