@@ -11,4 +11,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     List<OrderItem> findByOrder(Order order);
     List<OrderItem> findByOrderId(Long orderId);
 
+    // ✅ seller cancel bo'lganda faqat o'sha sub-order itemlari kerak
+    List<OrderItem> findBySellerOrderId(Long sellerOrderId);
+
 }

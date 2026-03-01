@@ -222,6 +222,7 @@ public class OrderService {
 
     @Transactional
     public void updateStatus(Long orderId, String status) {
+        User admin = userService.getCurrentUser(); // ✅ qo'shildi (ADMIN bo'lishi kerak)
 
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
@@ -281,6 +282,7 @@ public class OrderService {
             );
         }
 
+        syncSellerOrdersFromMaster(orderId, newStatus, admin); // user - admin bo'ladi
 
         // 🔔 NOTIFICATION
         notificationService.orderStatusChanged(
@@ -288,5 +290,90 @@ public class OrderService {
                 order,
                 newStatus
         );
+    }
+
+
+    private int rank(OrderStatus s) {
+        return switch (s) {
+            case NEW -> 1;
+            case CONFIRMED -> 2;
+            case PACKED -> 3;
+            case SHIPPED -> 4;
+            case DELIVERED -> 5;
+            case CANCELED -> 0;
+        };
+    }
+    @Transactional
+    public void syncSellerOrdersFromMaster(Long orderId, OrderStatus newStatus, User changedBy) {
+        List<SellerOrder> subs = sellerOrderRepo.findByOrderId(orderId);
+        if (subs.isEmpty()) return;
+
+        for (SellerOrder so : subs) {
+
+            // ✅ Admin CANCEL qilsa hammasini CANCEL qilamiz
+            if (newStatus == OrderStatus.CANCELED) {
+                if (so.getStatus() != OrderStatus.CANCELED) {
+                    so.setStatus(OrderStatus.CANCELED);
+                    sellerOrderRepo.save(so);
+                    sellerOrderHistoryService.addHistory(so, OrderStatus.CANCELED, changedBy);
+                }
+                continue;
+            }
+
+            // ✅ DELIVERED ham majburiy bo'lsin (xohlasangiz)
+            if (newStatus == OrderStatus.DELIVERED) {
+                if (so.getStatus() != OrderStatus.DELIVERED) {
+                    so.setStatus(OrderStatus.DELIVERED);
+                    sellerOrderRepo.save(so);
+                    sellerOrderHistoryService.addHistory(so, OrderStatus.DELIVERED, changedBy);
+                }
+                continue;
+            }
+
+            // ✅ qolganlari uchun faqat oldinga
+            if (rank(newStatus) < rank(so.getStatus())) continue;
+            if (so.getStatus() == newStatus) continue;
+
+            so.setStatus(newStatus);
+            sellerOrderRepo.save(so);
+            sellerOrderHistoryService.addHistory(so, newStatus, changedBy);
+        }
+    }
+
+    @Transactional
+    public void recalcMasterStatusFromSellerOrders(Long orderId) {
+
+        Order order = orderRepo.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        List<SellerOrder> subs = sellerOrderRepo.findByOrderId(orderId);
+        if (subs.isEmpty()) return;
+
+        boolean allCanceled = subs.stream().allMatch(s -> s.getStatus() == OrderStatus.CANCELED);
+        boolean allDelivered = subs.stream().allMatch(s -> s.getStatus() == OrderStatus.DELIVERED);
+
+        OrderStatus newMaster;
+
+        if (allCanceled) {
+            newMaster = OrderStatus.CANCELED;
+        } else if (allDelivered) {
+            newMaster = OrderStatus.DELIVERED;
+        } else {
+            // cancel bo'lmaganlar ichidan eng "kichik" progress master bo'lsin (ya'ni umumiy holat)
+            // masalan biri PACKED biri SHIPPED => master PACKED
+            OrderStatus min = subs.stream()
+                    .filter(s -> s.getStatus() != OrderStatus.CANCELED)
+                    .min((a, b) -> Integer.compare(rank(a.getStatus()), rank(b.getStatus())))
+                    .map(SellerOrder::getStatus)
+                    .orElse(OrderStatus.NEW);
+
+            newMaster = min;
+        }
+
+        if (order.getStatus() != newMaster) {
+            order.setStatus(newMaster);
+            orderRepo.save(order);
+            orderStatusHistoryService.log(order, newMaster);
+        }
     }
 }

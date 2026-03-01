@@ -3,6 +3,8 @@ package com.example.backend.service;
 import com.example.backend.entity.OrderStatus;
 import com.example.backend.entity.SellerOrder;
 import com.example.backend.entity.User;
+import com.example.backend.repository.OrderItemRepository;
+import com.example.backend.repository.ProductRepository;
 import com.example.backend.repository.SellerOrderRepository;
 import com.example.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class SellerOrderService {
 
+    private final OrderItemRepository orderItemRepo;
+    private final ProductRepository productRepo;
+    // SellerOrderService ichiga qo'shing
+    private final OrderService orderService;
     private final SellerOrderRepository sellerOrderRepository;
     private final SellerService sellerService;
     private final SellerOrderStatusHistoryService historyService;
@@ -57,28 +63,31 @@ public class SellerOrderService {
      * 2) seller_order_status_history insert
      * 3) (ixtiyoriy) master orders.status recalc
      */
-    public SellerOrder updateMySellerOrderStatus(Long sellerOrderId, OrderStatus  newStatus) {
+    public SellerOrder updateMySellerOrderStatus(Long sellerOrderId, OrderStatus newStatus) {
         SellerOrder so = getMySellerOrder(sellerOrderId);
 
-        // status o'zgarish qoidasi (xohlasangiz kuchaytiramiz)
-        validateTransition(so.getStatus(), newStatus);
+        OrderStatus oldStatus = so.getStatus(); // ✅ old status
+
+        validateTransition(oldStatus, newStatus);
+
+        // ✅ agar seller cancel qilsa -> stock qaytaramiz (faqat bir marta)
+        if (oldStatus != OrderStatus.CANCELED && newStatus == OrderStatus.CANCELED) {
+            restoreStockForSellerOrder(so.getId());
+        }
 
         so.setStatus(newStatus);
         SellerOrder saved = sellerOrderRepository.save(so);
 
-        // changed_by ni yozamiz (user topilmasa null qoldirsa ham bo'ladi)
         User changedBy = null;
         try {
             Long userId = currentUserService.requireUserId();
             changedBy = userRepository.findById(userId).orElse(null);
-        } catch (Exception ignored) {
-            // current user implement qilinmagan bo'lsa ham yiqilmasin
-        }
+        } catch (Exception ignored) {}
 
         historyService.addHistory(saved, newStatus, changedBy);
 
-        // optional: master order statusni qayta hisoblash
-        // recalcMasterOrderStatus(saved.getOrder().getId());
+        // ✅ master order statusni seller_orders dan qayta hisoblash
+        orderService.recalcMasterStatusFromSellerOrders(saved.getOrder().getId());
 
         return saved;
     }
@@ -118,7 +127,14 @@ public class SellerOrderService {
             }
         }
     }
-
+    private void restoreStockForSellerOrder(Long sellerOrderId) {
+        var items = orderItemRepo.findBySellerOrderId(sellerOrderId);
+        for (var item : items) {
+            var p = item.getProduct();
+            p.setStock(p.getStock() + item.getQuantity());
+            productRepo.save(p);
+        }
+    }
     /**
      * Agar master order statusni seller_orders dan avtomatik hisoblamoqchi bo'lsangiz:
      * - hamma DELIVERED => COMPLETED
@@ -129,4 +145,6 @@ public class SellerOrderService {
      * Bu funksiyani keyin OrderService bilan chiroyli qilib ulab beraman.
      */
     // private void recalcMasterOrderStatus(Long orderId) { ... }
+
+
 }

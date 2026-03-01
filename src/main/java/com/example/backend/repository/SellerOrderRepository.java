@@ -21,6 +21,7 @@ public interface SellerOrderRepository extends JpaRepository<SellerOrder, Long> 
             Pageable pageable
     );
 
+
     // Bir master order ichida ma'lum seller sub-orderini topish (split yaratishda ham kerak bo'ladi)
     Optional<SellerOrder> findByOrderIdAndSellerId(Long orderId, Long sellerId);
 
