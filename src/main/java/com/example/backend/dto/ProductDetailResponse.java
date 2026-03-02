@@ -31,8 +31,8 @@ public class ProductDetailResponse {
     private boolean favorite;
 
     private List<ProductImageResponse> images;
-
     private List<ProductDetailImageResponse> detailImages;
 
-
+    // ✅ NEW
+    private List<ProductVariantResponse> variants;
 }

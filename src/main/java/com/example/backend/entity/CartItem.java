@@ -5,7 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "cart_items",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "product_id"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "variant_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,9 +20,9 @@ public class CartItem {
 //    @ManyToOne(fetch = FetchType.LAZY)
     private User user;
 
-//    @ManyToOne(fetch = FetchType.EAGER)
+    //    @ManyToOne(fetch = FetchType.EAGER)
     @ManyToOne(fetch = FetchType.LAZY)
-    private Product product;
-
+    @JoinColumn(name = "variant_id", nullable = false)
+    private ProductVariant variant;
     private int quantity;
 }

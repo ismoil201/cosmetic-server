@@ -21,4 +21,6 @@ public class ProductCreateRequest {
 
     // 🔥 DETAIL PAGE IMAGES (Musinsa style)
     private List<ProductDetailImageRequest> detailImages;
+
+    private List<ProductVariantRequest> variants;
 }

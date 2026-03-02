@@ -23,9 +23,13 @@ public class ProductService {
     private final UserService userService;
     private final ProductImageRepository productImageRepo;
     private final ProductDetailImageRepository detailImageRepo;
-
+    private final InterestService interestService;
+    private final EventTrackingService eventTrackingService;
     private final SellerService sellerService;
     private final SearchLogRepository searchLogRepo;
+
+    private final ProductVariantRepository variantRepo;
+    private final VariantTierPriceRepository tierRepo;
     /* ================= CREATE ================= */
 
     @Transactional
@@ -107,6 +111,11 @@ public class ProductService {
 
         p.setViewCount(p.getViewCount() + 1);
 
+        if (user != null) {
+            eventTrackingService.logView(user, p);
+            interestService.onView(user, p);
+        }
+
         boolean favorite = false;
         if (user != null) {
             favorite = favRepo.existsByUserAndProduct(user, p);
@@ -130,6 +139,35 @@ public class ProductService {
                         ))
                         .toList();
 
+        // ================== 🔥 VARIANTS ==================
+
+        List<ProductVariantResponse> variants =
+                variantRepo.findByProductIdAndActiveTrueOrderBySortOrderAscIdAsc(p.getId())
+                        .stream()
+                        .map(v -> {
+
+                            List<VariantTierResponse> tiers =
+                                    tierRepo.findAllByVariantIdOrderByMinQtyAsc(v.getId())
+                                            .stream()
+                                            .map(t -> new VariantTierResponse(
+                                                    t.getMinQty(),
+                                                    t.getTotalPrice()
+                                            ))
+                                            .toList();
+
+                            return new ProductVariantResponse(
+                                    v.getId(),
+                                    v.getLabel(),
+                                    v.getPrice(),
+                                    v.getDiscountPrice(),
+                                    v.getStock(),
+                                    tiers
+                            );
+                        })
+                        .toList();
+
+        productRepo.save(p);
+
         return new ProductDetailResponse(
                 p.getId(),
                 p.getName(),
@@ -141,14 +179,13 @@ public class ProductService {
                 p.getStock(),
                 p.getRatingAvg(),
                 p.getReviewCount(),
-                p.getSoldCount(),      // 🔥
-                p.isTodayDeal(),       // 🔥
+                p.getSoldCount(),
+                p.isTodayDeal(),
                 favorite,
                 images,
-                detailImages
+                detailImages,
+                variants // ✅ NEW
         );
-
-
     }
 
     // TODAY DEAL BANNER

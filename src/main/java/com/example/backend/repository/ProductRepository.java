@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -237,5 +238,49 @@ WHERE p.active = 1
             @Param("excludeEmpty") boolean excludeEmpty,
             Pageable pageable
     );
+
+    // 1) category bo‘yicha candidates (exclude ids)
+    @Query("""
+        select p from Product p
+        where p.active = true
+          and p.category in :cats
+          and (:excludeEmpty = true or p.id not in :excludeIds)
+        order by p.soldCount desc, p.viewCount desc, p.id desc
+    """)
+    List<Product> activeByCategories(@Param("cats") List<Category> cats,
+                                     @Param("excludeIds") List<Long> excludeIds,
+                                     @Param("excludeEmpty") boolean excludeEmpty,
+                                     Pageable pageable);
+
+    // 2) brand bo‘yicha candidates (lower-case compare)
+    @Query("""
+        select p from Product p
+        where p.active = true
+          and lower(trim(p.brand)) in :brands
+          and (:excludeEmpty = true or p.id not in :excludeIds)
+        order by p.soldCount desc, p.viewCount desc, p.id desc
+    """)
+    List<Product> activeByBrands(@Param("brands") List<String> brands,
+                                 @Param("excludeIds") List<Long> excludeIds,
+                                 @Param("excludeEmpty") boolean excludeEmpty,
+                                 Pageable pageable);
+
+    // 3) category + price band (± pct) ichida
+    @Query("""
+        select p from Product p
+        where p.active = true
+          and p.category = :cat
+          and p.price between :minPrice and :maxPrice
+          and (:excludeEmpty = true or p.id not in :excludeIds)
+        order by p.soldCount desc, p.viewCount desc, p.id desc
+    """)
+    List<Product> activeByCategoryAndPriceBand(@Param("cat") Category cat,
+                                               @Param("minPrice") BigDecimal minPrice,
+                                               @Param("maxPrice") BigDecimal maxPrice,
+                                               @Param("excludeIds") List<Long> excludeIds,
+                                               @Param("excludeEmpty") boolean excludeEmpty,
+                                               Pageable pageable);
+
+    // sizda bor bo‘lsa ishlatamiz:
 
 }

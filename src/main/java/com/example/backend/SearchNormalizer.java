@@ -5,74 +5,37 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * SearchNormalizer (ZAVEN / cosmetics)
+ * Universal SearchNormalizer for ZAVEN (UZ/RU/EN)
  *
- * ✅ Maqsad:
- *  - Uzbek (lotin), rus (kiril), inglizcha querylarni bir xil ko‘rinishga keltirish
- *  - sinonimlar: penka/foam/cleanser, atir/parfyum/perfume, kushon/cushion, tonal/tonalka, SPF, mist/toner...
- *  - brend variantlari va typo fix
- *  - 18 ta siz bergan product uchun "tez topish" (token-index + scoring)
+ * Goal:
+ *  - Normalize query + product text to canonical tokens
+ *  - Handle Uzbek apostrophes, Cyrillic transliteration, synonyms, brand typos
+ *  - Works for ALL products (not hardcoded 55 items)
  *
- * Qanday ishlatish:
- *  - SearchNormalizer.normalize("Роундлаб докдо пенка") -> "round lab 1025 dokdo cleanser"
- *  - SearchNormalizer.search("dokdo penka", 10) -> top natijalar
+ * Usage:
+ *  - String normalized = SearchNormalizer.normalize("kallagen ichiladigan");
+ *  - search_text = SearchNormalizer.buildSearchText(name, brand, category, description, variantLabels)
  */
 public final class SearchNormalizer {
 
-    // -----------------------------
-    // Public DTO
-    // -----------------------------
-    public static final class SearchResult {
-        public final int id;
-        public final String title;
-        public final double score;
-        public final List<String> matched;
-
-        public SearchResult(int id, String title, double score, List<String> matched) {
-            this.id = id;
-            this.title = title;
-            this.score = score;
-            this.matched = matched;
-        }
-
-        @Override public String toString() {
-            return "SearchResult{id=" + id + ", score=" + score + ", title='" + title + "', matched=" + matched + "}";
-        }
-    }
+    private SearchNormalizer() {}
 
     // -----------------------------
-    // Internal Product Entry
+    // Config
     // -----------------------------
-    private static final class ProductEntry {
-        final int id;
-        final String type;   // SERUM / CREAM / CLEANSER / TONER / MAKEUP / COSMETICS / SKINCARE...
-        final String title;  // siz bergan “Title”
-        final Set<String> tokens;      // asosiy tokenlar
-        final Set<String> strongTokens; // kuchli tokenlar (brand/line/spf/retinol...) ko‘proq ball beradi
+    private static final Pattern SPLIT = Pattern.compile("[^a-z0-9]+");
+    private static final Pattern MULTI_SPACE = Pattern.compile("\\s+");
 
-        ProductEntry(int id, String type, String title, Set<String> tokens, Set<String> strongTokens) {
-            this.id = id;
-            this.type = type;
-            this.title = title;
-            this.tokens = tokens;
-            this.strongTokens = strongTokens;
-        }
-    }
-
-    // -----------------------------
-    // Fix & Synonyms
-    // -----------------------------
-    // 1) bir so‘zlik typo/variant -> canonical token
+    // 1) typo/variant -> canonical token(s)
     private static final Map<String, String> FIX = new HashMap<>();
 
-    // 2) sinonimlar: query token -> canonical token (bir nechta token ham bo‘lishi mumkin)
-    //    Masalan: "yuvish" -> "cleanser", "tonalka" -> "cushion", "kushon" -> "cushion"
+    // 2) synonyms -> canonical token(s)
     private static final Map<String, String> SYN = new HashMap<>();
 
-    // 3) stopwords (ball bermaydigan / shovqin so‘zlar)
+    // 3) stopwords (noise words)
     private static final Set<String> STOP = new HashSet<>();
 
-    // 4) Cyrillic -> Latin (RU + UZ Cyrillic)
+    // 4) Cyrillic -> Latin (RU + UZ cyr)
     private static final Map<Character, String> CYR_TO_LAT = Map.ofEntries(
             // RU
             Map.entry('а',"a"), Map.entry('б',"b"), Map.entry('в',"v"),
@@ -86,81 +49,92 @@ public final class SearchNormalizer {
             Map.entry('ч',"ch"), Map.entry('ш',"sh"), Map.entry('щ',"sh"),
             Map.entry('ъ',""), Map.entry('ы',"i"), Map.entry('ь',""),
             Map.entry('э',"e"), Map.entry('ю',"yu"), Map.entry('я',"ya"),
-            // UZ Cyrillic (ko‘p uchraydigan)
+            // UZ Cyrillic
             Map.entry('қ',"q"), Map.entry('ў',"o"), Map.entry('ғ',"g"),
             Map.entry('ҳ',"h"), Map.entry('ң',"n")
     );
 
-    // Regex split: hamma harf/raqam emas narsalarni bo‘luvchi qilamiz
-    private static final Pattern SPLIT = Pattern.compile("[^a-z0-9]+");
-    private static final Pattern MULTI_SPACE = Pattern.compile("\\s+");
-
-    // -----------------------------
-    // Product Index
-    // -----------------------------
-    private static final List<ProductEntry> PRODUCTS = new ArrayList<>();
-
-    // token -> productIds (tez topish)
-    private static final Map<String, Set<Integer>> INVERTED = new HashMap<>();
-    private static final Map<Integer, ProductEntry> BY_ID = new HashMap<>();
-
-    // -----------------------------
-    // Static init
-    // -----------------------------
     static {
-        // -------- FIX (brend / yozilish variantlari) --------
+        // -----------------------------
+        // BRAND FIXES (ENG/RU/UZ variants)
+        // -----------------------------
+        putFix("axisy", "axis y");
+        putFix("axis-y", "axis y");
+        putFix("axis", "axis y");            // ehtiyot: siz ko‘p “axis” deb qidirasiz
+        putFix("аксис", "axis y");
         putFix("roundlab", "round lab");
-        putFix("round", "round lab"); // ehtiyot: umumiy, lekin sizda Round Lab ko‘p
+        putFix("round", "round lab");        // round -> round lab (sizda ko‘p ishlatiladi)
         putFix("dokdo", "1025 dokdo");
-        putFix("dokdo1025", "1025 dokdo");
-        putFix("tirtir", "tirtir");
-        putFix("tir tir", "tirtir");
+        putFix("1025dokdo", "1025 dokdo");
         putFix("skin1004", "skin1004");
         putFix("скин1004", "skin1004");
-        putFix("centella", "centella");
-        putFix("센텔라", "centella");
-        putFix("axisy", "axis-y");
-        putFix("axis", "axis-y");
-        putFix("althea", "dr althea");
+        putFix("madagaskar", "madagascar");
+        putFix("beautyofjoseon", "beauty of joseon");
+        putFix("boj", "beauty of joseon");
+
         putFix("drjart", "dr jart");
         putFix("dr.jart", "dr jart");
-        putFix("aromatica", "aromatica");
-        putFix("winkgirl", "wink girl");
-        putFix("wink", "wink girl");
-        putFix("dermashare", "dermashare");
-        putFix("derma", "dermashare"); // sizda DermaShare bor
-        putFix("polmedison", "polmedison");
+        putFix("althea", "dr althea");
+        putFix("dralthea", "dr althea");
 
-        // -------- SYN (UZ/RU/ENG sinonimlar) --------
+        putFix("tirtir", "tirtir");
+        putFix("tir tir", "tirtir");
+
+        putFix("anua", "anua");
+        putFix("celimax", "celimax");
+        putFix("clio", "clio");
+        putFix("sulwhasoo", "sulwhasoo");
+        putFix("torriden", "torriden");
+        putFix("farmstay", "farm stay");
+        putFix("skin1004madagascar", "skin1004 madagascar");
+        putFix("polmedison", "polmedison");
+        putFix("dermashare", "dermashare");
+        putFix("aromatica", "aromatica");
+        putFix("muzigae", "muzigae");
+        putFix("mansion", "mansion");
+        putFix("lactofit", "lactofit");
+        putFix("laktofit", "lactofit");
+        putFix("boto", "boto");
+
+        // -----------------------------
+        // CORE SYNONYMS (category words)
+        // -----------------------------
         // perfume
         putSyn("atir", "parfum");
-        putSyn("attar", "parfum");
         putSyn("parfyum", "parfum");
+        putSyn("attar", "parfum");
         putSyn("perfume", "parfum");
         putSyn("fragrance", "parfum");
-        putSyn("bombshell", "bombshell");
+        putSyn("парфюм", "parfum");
+        putSyn("духи", "parfum");
 
         // cleanser / foam / penka
         putSyn("penka", "cleanser");
         putSyn("пенка", "cleanser");
         putSyn("foam", "cleanser");
         putSyn("cleanser", "cleanser");
+        putSyn("facewash", "cleanser");
+        putSyn("wash", "cleanser");
         putSyn("yuvish", "cleanser");
         putSyn("yuvishpenka", "cleanser");
-        putSyn("facewash", "cleanser");
-        putSyn("washing", "cleanser");
+        putSyn("yuvishgel", "cleanser");
+        putSyn("gel", "cleanser"); // ko‘p gel yuvish vositalari
 
-        // cream
+        // cream / moisturizer
         putSyn("krem", "cream");
         putSyn("крем", "cream");
         putSyn("cream", "cream");
         putSyn("moisturizer", "cream");
+        putSyn("balm", "balm");
 
-        // serum / essence / ampoule
+        // serum / ampoule / essence
         putSyn("serum", "serum");
         putSyn("сыворотка", "serum");
-        putSyn("essence", "essence");
         putSyn("ampoule", "ampoule");
+        putSyn("ampula", "ampoule");
+        putSyn("эссенция", "essence");
+        putSyn("essence", "essence");
+        putSyn("shot", "shot");
 
         // toner / mist
         putSyn("toner", "toner");
@@ -168,8 +142,8 @@ public final class SearchNormalizer {
         putSyn("тоник", "toner");
         putSyn("mist", "mist");
         putSyn("mister", "mist");
-        putSyn("спрей", "mist");
         putSyn("spray", "mist");
+        putSyn("спрей", "mist");
 
         // sunscreen / spf
         putSyn("spf", "sunscreen");
@@ -178,315 +152,150 @@ public final class SearchNormalizer {
         putSyn("suncream", "sunscreen");
         putSyn("sun", "sunscreen");
         putSyn("quyosh", "sunscreen");
-        putFix("axis-y", "axis y");
-        putFix("axisy", "axis y");
-        putFix("аксис", "axis"); // xohlasang
+        putSyn("kuyosh", "sunscreen");
+        putSyn("защита", "sunscreen");
 
         // cushion / makeup
         putSyn("kushon", "cushion");
         putSyn("кушон", "cushion");
         putSyn("cushion", "cushion");
-        putSyn("tonalka", "cushion");
-        putSyn("тоналка", "cushion");
+        putSyn("tonalka", "foundation");
+        putSyn("тоналка", "foundation");
         putSyn("foundation", "foundation");
+        putSyn("ton", "foundation");
         putSyn("тон", "foundation");
         putSyn("maskara", "mascara");
         putSyn("туш", "mascara");
         putSyn("mascara", "mascara");
+        putSyn("lip", "lip");
+        putSyn("cheek", "cheek");
+        putSyn("palette", "palette");
 
-        // ingredient tokens
-        putSyn("retinal", "retinal");
+        // patches
+        putSyn("patch", "patch");
+        putSyn("patche", "patch");
+        putSyn("патчи", "patch");
+        putSyn("eye", "eye");
+        putSyn("ko‘z", "eye");
+        putSyn("koz", "eye");
+
+        // supplements (food)
+        putSyn("probiotic", "probiotic");
+        putSyn("probiotik", "probiotic");
+        putSyn("пробиотик", "probiotic");
+        putSyn("biotin", "biotin");
+
+        // -----------------------------
+        // INGREDIENT / KEYWORD SYNONYMS
+        // -----------------------------
         putSyn("retinol", "retinol");
-        putSyn("vitaminc", "vitamin c");
-        putSyn("vitamin", "vitamin");
-        putSyn("glutathione", "glutathione");
-        putSyn("teatree", "tea tree");
-        putSyn("cica", "cica");
+        putSyn("retinal", "retinal");
         putSyn("centella", "centella");
-        putSyn("rosemary", "rosemary");
+        putSyn("cica", "centella");
+        putSyn("мадекассосид", "madecassoside");
+        putSyn("madecassoside", "madecassoside");
 
-        // -------- STOPWORDS --------
+        putSyn("glutathione", "glutathione");
+        putSyn("глутатион", "glutathione");
+        putSyn("niacinamide", "niacinamide");
+        putSyn("ниацинамид", "niacinamide");
+        putSyn("tranexamic", "tranexamic");
+        putSyn("транексам", "tranexamic");
+        putSyn("vitamin", "vitamin");
+        putSyn("vitaminc", "vitamin c");
+        putSyn("vitaminс", "vitamin c");
+        putSyn("vitamin-c", "vitamin c");
+        putSyn("vitc", "vitamin c");
+
+        putSyn("tea", "tea");
+        putSyn("tree", "tree");
+        putSyn("teatree", "tea tree");
+
+        // ✅ collagen variants (your issue)
+        putSyn("collagen", "collagen");
+        putSyn("kollagen", "collagen");
+        putSyn("kallagen", "collagen");
+        putSyn("kalagen", "collagen");
+        putSyn("коллаген", "collagen");
+
+        // -----------------------------
+        // STOPWORDS (UZ/RU common)
+        // -----------------------------
         Collections.addAll(STOP,
-                "uchun","bilan","ham","va","yoki","bu","shu","qanday","nima","nechi","ml","g",
-                "yuz","teri","koz","ko‘z","atrofi","qarshi","mos","koreys","koreya","import",
-                "sifatli","original","parvarish","kuchli","yengil","kundalik","kunduzi","kechqurun",
-                "ideal","turi","hajmi","asosiy","brend","mahsulot","mahsulotlar","toifa"
+                "uchun","bilan","ham","va","yoki","bu","shu","qanday","nima","nechi",
+                "ml","g","gr","kg","dona","ta","xil","turi","original","import",
+                "yuz","teri","bosh","soch","ko‘z","koz","atrofi","qarshi","mos",
+                "koreys","koreya","ayollar","erkaklar","kundalik","kechasi","kunduzi",
+                "parvarish","foydasi","tinchlantiradi","namlantiradi","yaxshilaydi",
+                "set","mini","nabor","to‘plam","toplam","kit",
+                "uchun","the","and","for","with"
         );
-
-        // -----------------------------
-        // YOUR 18 PRODUCTS (hardcoded index)
-        // -----------------------------
-        // Eslatma: 14-16 bir xil title, lekin siz ro‘yxatda 3 marta bergansiz -> ID bo‘yicha alohida entry qoldirdim.
-        addProduct(1,  "SERUM",     "Retinol Roll-On Eye Serum (30 ml) – ko‘z atrofi ajinlarga qarshi serum",
-                "retinol roll on eye serum 30 ml ko‘z atrof ajin qora doira shish");
-        addProduct(2,  "CREAM",     "Polmedison Glutathione + Vitamin C Eye Cream (20 ml) – qora doiralar va ajinlarga qarshi krem",
-                "polmedison glutathione vitamin c eye cream 20 ml qora doira ajin brightening");
-        addProduct(3,  "CREAM",     "DermaShare Vegan Waterful Vitamin Sun Cream SPF50+ PA++++ (50 g) – quyosh kremi",
-                "dermashare vegan waterful vitamin sun cream spf50 pa++++ 50g sunscreen");
-        addProduct(4,  "SKINCARE",  "DermaShare Tea Tree Acne pH Balance Foam Cleanser (150 ml) – aknega qarshi penka",
-                "dermashare tea tree acne ph balance foam cleanser 150 ml akne husnbuzar");
-        addProduct(5,  "CLEANSER",  "Round Lab 1025 Dokdo Cleanser (150 ml) – pH-balansli yuz yuvish penkasi",
-                "round lab 1025 dokdo cleanser 150 ml penka ph");
-        addProduct(6,  "CREAM",     "Round Lab 1025 Dokdo Cream (80 ml) – pH-balansli namlovchi yuz kremi",
-                "round lab 1025 dokdo cream 80 ml moisturizer namlovchi");
-        addProduct(7,  "SERUM",     "Aromatica Rosemary Root Enhancer (100 ml) – scalp essence spray",
-                "aromatica rosemary root enhancer 100 ml scalp essence spray haircare soch ildiz");
-        addProduct(8,  "MAKEUP",    "Wink Girl Idol Volume Mascara (10 ml) – kirpik hajm beruvchi tush",
-                "wink girl idol volume mascara 10 ml туш maskara kirpik");
-        addProduct(9,  "CLEANSER",  "Round Lab Birch Juice Cleanser (150 ml) – namlovchi yuz yuvish penkasi",
-                "round lab birch juice cleanser 150 ml namlovchi");
-        addProduct(10, "COSMETICS", "Come Inside Me Bombshell – ayollar uchun parfum / atir",
-                "come inside me bombshell parfum atir ayollar fragrance");
-        addProduct(11, "COSMETICS", "TIRTIR Mask Fit Red Cushion SPF40 PA++ – cushion / tonal",
-                "tirtir mask fit red cushion spf40 pa++ kushon tonalka foundation");
-        addProduct(12, "COSMETICS", "Centella mini nabor ko‘k rangli – set / kit",
-                "centella mini nabor kok rangli set kit skin1004 madagascar");
-        addProduct(13, "COSMETICS", "Centella mini nabor ko‘k rangli – namlantiruvchi tinchlantiruvchi set",
-                "centella mini nabor kok rangli set kit namlantiruvchi tinchlantiradi");
-        addProduct(14, "CREAM",     "SKIN1004 Madagascar Centella Cream – sariq krem (namlantiruvchi)",
-                "skin1004 madagascar centella cream sariq krem cica barrier");
-        addProduct(15, "CREAM",     "SKIN1004 Madagascar Centella Cream – sariq krem (namlantiruvchi)",
-                "skin1004 madagascar centella cream sariq krem cica barrier");
-        addProduct(16, "CREAM",     "SKIN1004 Madagascar Centella Cream – sariq krem (namlantiruvchi)",
-                "skin1004 madagascar centella cream sariq krem cica barrier");
-        addProduct(17, "SKINCARE",  "AXIS-Y foam cleanser – ugrili va yog‘li teri uchun penka",
-                "axis-y cleanser penka ugri yogli teri pores");
-        addProduct(18, "TONER",     "Dr. Althea 345 Relief Cream Mist – toner + mist (spray)",
-                "dr althea 345 relief cream mist toner spray panthenol hyaluronic");
-
-        // build inverted index
-        buildIndex();
     }
 
-    private SearchNormalizer() {}
-
     // -----------------------------
-    // Public API
+    // Public
     // -----------------------------
-
-    /** Faqat query normalize (DB LIKE, fulltext, va h.k. uchun) */
-    public static String normalize(String q) {
-        List<String> tokens = normalizeToTokens(q);
+    public static String normalize(String text) {
+        List<String> tokens = normalizeToTokens(text);
         return String.join(" ", tokens);
     }
 
     /**
-     * Tez search:
-     * - query tokenlari bo‘yicha candidate IDs topiladi (inverted index)
-     * - scoring: exact/strong/prefix
-     * - top N natija
+     * Build DB search_text from product fields.
+     * Put EVERYTHING valuable into one normalized string:
+     * - name + brand + category + description + variants (labels)
      */
-    public static List<SearchResult> search(String query, int limit) {
-        if (limit <= 0) limit = 10;
-
-        List<String> qTokens = normalizeToTokens(query);
-        if (qTokens.isEmpty()) return List.of();
-
-        // Candidate IDs: tokenlar bo‘yicha union
-        Set<Integer> candidates = new LinkedHashSet<>();
-        for (String t : qTokens) {
-            Set<Integer> ids = INVERTED.get(t);
-            if (ids != null) candidates.addAll(ids);
-        }
-
-        // Agar umuman topilmasa: "prefix fallback" (masalan: "dok" -> dokdo)
-        if (candidates.isEmpty()) {
-            for (String qt : qTokens) {
-                for (String key : INVERTED.keySet()) {
-                    if (key.startsWith(qt) || qt.startsWith(key)) {
-                        candidates.addAll(INVERTED.getOrDefault(key, Set.of()));
-                    }
-                }
+    public static String buildSearchText(
+            String name,
+            String brand,
+            String category,
+            String description,
+            Collection<String> variantLabels
+    ) {
+        StringBuilder sb = new StringBuilder();
+        if (name != null) sb.append(name).append(" ");
+        if (brand != null) sb.append(brand).append(" ");
+        if (category != null) sb.append(category).append(" ");
+        if (description != null) sb.append(description).append(" ");
+        if (variantLabels != null) {
+            for (String v : variantLabels) {
+                if (v != null) sb.append(v).append(" ");
             }
         }
 
-        if (candidates.isEmpty()) return List.of();
-
-        List<SearchResult> results = new ArrayList<>();
-        for (int id : candidates) {
-            ProductEntry p = BY_ID.get(id);
-            if (p == null) continue;
-
-            Score sc = scoreProduct(p, qTokens);
-            if (sc.score > 0) {
-                results.add(new SearchResult(p.id, p.title, sc.score, sc.matched));
-            }
-        }
-
-        results.sort((a, b) -> {
-            int c = Double.compare(b.score, a.score);
-            if (c != 0) return c;
-            return Integer.compare(a.id, b.id);
-        });
-
-        if (results.size() > limit) return results.subList(0, limit);
-        return results;
-    }
-
-    /** ID bo‘yicha product title olish (debug) */
-    public static String titleById(int id) {
-        ProductEntry p = BY_ID.get(id);
-        return p == null ? null : p.title;
+        // normalized + raw combo is best (raw helps exact, normalized helps fuzzy)
+        String raw = safeLower(sb.toString());
+        String norm = normalize(raw);
+        return (raw + " " + norm).trim();
     }
 
     // -----------------------------
-    // Scoring
+    // Pipeline
     // -----------------------------
-    private static final class Score {
-        final double score;
-        final List<String> matched;
-        Score(double score, List<String> matched) {
-            this.score = score;
-            this.matched = matched;
-        }
-    }
-
-    private static Score scoreProduct(ProductEntry p, List<String> qTokens) {
-        double score = 0.0;
-        List<String> matched = new ArrayList<>();
-
-        // bonus: queryda "type" bo‘lsa (cream/cleanser/serum/toner/parfum/mascara/cushion)
-        for (String qt : qTokens) {
-            if (qt.equalsIgnoreCase(p.type.toLowerCase())) score += 2.0;
-        }
-
-        for (String qt : qTokens) {
-            if (STOP.contains(qt)) continue;
-
-            if (p.strongTokens.contains(qt)) {
-                score += 6.0;
-                matched.add(qt);
-                continue;
-            }
-            if (p.tokens.contains(qt)) {
-                score += 3.0;
-                matched.add(qt);
-                continue;
-            }
-
-            // prefix match (masalan: "dok" -> "dokdo", "centel" -> "centella")
-            String best = bestPrefixMatch(qt, p.strongTokens);
-            if (best != null) {
-                score += 3.5;
-                matched.add(qt + "→" + best);
-                continue;
-            }
-            best = bestPrefixMatch(qt, p.tokens);
-            if (best != null) {
-                score += 1.5;
-                matched.add(qt + "→" + best);
-            }
-        }
-
-        // Agar query tokenlarining katta qismi topilgan bo‘lsa qo‘shimcha bonus
-        int meaningful = 0;
-        for (String qt : qTokens) if (!STOP.contains(qt)) meaningful++;
-        if (meaningful > 0) {
-            double hitRatio = Math.min(1.0, matched.size() / (double) meaningful);
-            score += hitRatio * 2.0;
-        }
-
-        return new Score(score, matched);
-    }
-
-    private static String bestPrefixMatch(String q, Set<String> tokens) {
-        if (q.length() < 3) return null;
-        String best = null;
-        for (String t : tokens) {
-            if (t.startsWith(q) || q.startsWith(t)) {
-                if (best == null || t.length() > best.length()) best = t;
-            }
-        }
-        return best;
-    }
-
-    // -----------------------------
-    // Index building
-    // -----------------------------
-    private static void addProduct(int id, String type, String title, String extraKeywords) {
-        String base = (type + " " + title + " " + extraKeywords);
-        List<String> toks = normalizeToTokens(base);
-
-        Set<String> tokenSet = new LinkedHashSet<>(toks);
-
-        // strong tokens: brendlar/line/ingredient/spf va “model” sonlari
-        Set<String> strong = new LinkedHashSet<>();
-        for (String t : tokenSet) {
-            if (isStrongToken(t)) strong.add(t);
-        }
-
-        ProductEntry p = new ProductEntry(id, type, title, tokenSet, strong);
-        PRODUCTS.add(p);
-        BY_ID.put(id, p);
-    }
-
-    private static boolean isStrongToken(String t) {
-        if (t == null || t.isBlank()) return false;
-
-        // brend/line
-        if (t.equals("round") || t.equals("lab") || t.equals("roundlab") || t.equals("roundlab")) return true;
-        if (t.equals("round") || t.equals("lab")) return true; // round lab split
-        if (t.equals("dermashare") || t.equals("polmedison") || t.equals("aromatica") || t.equals("tirtir")
-                || t.equals("skin1004") || t.equals("axis-y") || t.equals("althea") || t.equals("dr")) return true;
-
-        // ingredient / category
-        if (t.equals("retinol") || t.equals("retinal") || t.equals("glutathione") || t.equals("vitamin")
-                || t.equals("c") || t.equals("vitamin c") || t.equals("tea") || t.equals("tree")
-                || t.equals("centella") || t.equals("cica") || t.equals("rosemary")) return true;
-
-        // SPF / PA / line numbers
-        if (t.startsWith("spf") || t.equals("pa") || t.equals("pa++") || t.equals("pa++++")) return true;
-        if (t.equals("1025") || t.equals("345")) return true;
-
-        // product identity words
-        if (t.equals("dokdo") || t.equals("birch") || t.equals("juice") || t.equals("mask") || t.equals("fit")
-                || t.equals("cushion") || t.equals("mascara") || t.equals("bombshell")) return true;
-
-        // uzun tokenlar (ko‘proq signal)
-        return t.length() >= 8;
-    }
-
-    private static void buildIndex() {
-        INVERTED.clear();
-        for (ProductEntry p : PRODUCTS) {
-            for (String t : p.tokens) {
-                if (STOP.contains(t)) continue;
-                INVERTED.computeIfAbsent(t, k -> new LinkedHashSet<>()).add(p.id);
-            }
-            // strongTokens ham indexga kiritiladi (baribir tokens ichida bo‘ladi, lekin shunaqa ham ok)
-            for (String t : p.strongTokens) {
-                if (STOP.contains(t)) continue;
-                INVERTED.computeIfAbsent(t, k -> new LinkedHashSet<>()).add(p.id);
-            }
-        }
-    }
-
-    // -----------------------------
-    // Normalization pipeline
-    // -----------------------------
-    private static List<String> normalizeToTokens(String input) {
+    public static List<String> normalizeToTokens(String input) {
         if (input == null) return List.of();
 
         String s = input.trim().toLowerCase(Locale.ROOT);
         if (s.isEmpty()) return List.of();
 
-        // 0) Uzbek apostrophes normalization (o‘ g‘ etc.)
+        // 0) UZ apostrophes normalize
         s = normalizeUzApostrophes(s);
 
-        // 1) Cyrillic -> latin (ru/uz cyr)
+        // 1) Cyrillic -> latin
         s = transliterateCyrillic(s);
 
-        // 2) Unicode diacritics remove (NFKD)
+        // 2) Remove diacritics
         s = removeDiacritics(s);
 
-        // 3) replace some separators with space
-        s = s.replace('&', ' ');
-        s = s.replace('+', ' ');
-        s = s.replace('/', ' ');
-        s = s.replace('_', ' ');
+        // 3) Normalize separators
+        s = s.replace('&', ' ')
+                .replace('+', ' ')
+                .replace('/', ' ')
+                .replace('_', ' ')
+                .replace('-', ' ');
         s = MULTI_SPACE.matcher(s).replaceAll(" ").trim();
 
-        // 4) split to raw tokens
+        // 4) Split
         String[] raw = SPLIT.split(s);
         List<String> out = new ArrayList<>(raw.length);
 
@@ -495,13 +304,10 @@ public final class SearchNormalizer {
             String tok = r.trim();
             if (tok.isEmpty()) continue;
 
-            // 5) apply FIX (single token or known compact forms)
+            // compact normalize: spf50 pa++++ -> tokens already split but keep numbers
             tok = applyFix(tok);
-
-            // 6) apply SYN
             tok = applySyn(tok);
 
-            // 7) split again if mapping produced spaces (e.g. "round lab", "vitamin c")
             if (tok.contains(" ")) {
                 for (String t2 : tok.split("\\s+")) {
                     String t3 = t2.trim();
@@ -512,26 +318,27 @@ public final class SearchNormalizer {
             }
         }
 
-        // 8) final cleanup: remove stopwords and 1-char noise (except c / g maybe)
+        // 5) Cleanup
         List<String> cleaned = new ArrayList<>();
         for (String t : out) {
             if (t.isBlank()) continue;
             if (STOP.contains(t)) continue;
+            // keep 1-char only if meaningful
             if (t.length() == 1 && !(t.equals("c") || t.equals("g"))) continue;
             cleaned.add(t);
         }
 
-        return cleaned;
+        // 6) Deduplicate lightly (preserve order)
+        return new ArrayList<>(new LinkedHashSet<>(cleaned));
     }
 
     private static String applyFix(String tok) {
         String fixed = FIX.get(tok);
         if (fixed != null) return fixed;
 
-        // Ba’zi “yopishib yozilgan” holatlar:
-        // "beautyofjoseon" -> "beauty of joseon" (siz keyin qo‘shishingiz mumkin)
-        // hozir minimal:
-        if (tok.equals("roundlab")) return "round lab";
+        // extra compact forms
+        if (tok.equals("spf50") || tok.equals("spf50plus") || tok.equals("spf50+")) return "spf 50";
+        if (tok.equals("pa++++") || tok.equals("pa+++")) return "pa";
         if (tok.equals("maskfit")) return "mask fit";
         return tok;
     }
@@ -542,17 +349,19 @@ public final class SearchNormalizer {
     }
 
     private static String normalizeUzApostrophes(String s) {
-        // o‘, g‘, shuningdek turli apostrof turlari: ’ ‘ ` ´
-        return s
-                .replace("o‘", "o")
-                .replace("o'", "o")
-                .replace("o’", "o")
-                .replace("g‘", "g")
-                .replace("g'", "g")
-                .replace("g’", "g")
-                .replace("ko‘z", "koz")
-                .replace("ko'z", "koz")
-                .replace("ko’z", "koz");
+        // normalize many apostrophe variants
+        s = s.replace("’", "'")
+                .replace("‘", "'")
+                .replace("`", "'")
+                .replace("´", "'");
+
+        // o‘ / g‘
+        s = s.replace("o‘", "o").replace("o'", "o");
+        s = s.replace("g‘", "g").replace("g'", "g");
+
+        // common words
+        s = s.replace("ko‘z", "koz").replace("ko'z", "koz");
+        return s;
     }
 
     private static String transliterateCyrillic(String text) {
@@ -564,21 +373,16 @@ public final class SearchNormalizer {
     }
 
     private static String removeDiacritics(String s) {
-        // NFKD -> combining marks remove
         String norm = Normalizer.normalize(s, Normalizer.Form.NFKD);
         StringBuilder sb = new StringBuilder(norm.length());
         for (int i = 0; i < norm.length(); i++) {
             char ch = norm.charAt(i);
-            // skip diacritic marks
             if (Character.getType(ch) == Character.NON_SPACING_MARK) continue;
             sb.append(ch);
         }
         return sb.toString();
     }
 
-    // -----------------------------
-    // Helpers to fill maps
-    // -----------------------------
     private static void putFix(String from, String to) {
         if (from == null || to == null) return;
         FIX.put(from.toLowerCase(Locale.ROOT), to.toLowerCase(Locale.ROOT));
@@ -587,5 +391,9 @@ public final class SearchNormalizer {
     private static void putSyn(String from, String to) {
         if (from == null || to == null) return;
         SYN.put(from.toLowerCase(Locale.ROOT), to.toLowerCase(Locale.ROOT));
+    }
+
+    private static String safeLower(String s) {
+        return s == null ? "" : s.toLowerCase(Locale.ROOT).trim();
     }
 }

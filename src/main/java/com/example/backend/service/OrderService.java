@@ -24,6 +24,9 @@ public class OrderService {
     private final SellerOrderRepository sellerOrderRepo;
     private final SellerOrderStatusHistoryService sellerOrderHistoryService;
 
+    // inject qo‘shing:
+    private final ProductVariantRepository variantRepo;
+    private final PricingService pricingService;
     // ✅ FINAL: receiver + address manbalari
     private final ReceiverService receiverService;
     private final AddressService addressService;
@@ -66,7 +69,7 @@ public class OrderService {
         Map<Seller, List<CartItem>> grouped =
                 cartItems.stream()
                         .collect(java.util.stream.Collectors.groupingBy(
-                                c -> c.getProduct().getSeller()
+                                c -> c.getVariant().getProduct().getSeller()
                         ));
 
         BigDecimal grandTotal = BigDecimal.ZERO;
@@ -96,34 +99,31 @@ public class OrderService {
 
             for (CartItem c : items) {
 
-                Product product = c.getProduct();
+                ProductVariant v = c.getVariant();
+                Product product = v.getProduct();
 
-                if (product.getStock() < c.getQuantity()) {
-                    throw new RuntimeException("Not enough stock: " + product.getName());
+                if (v.getStock() < c.getQuantity()) {
+                    throw new RuntimeException("Not enough stock: " + product.getName() + " " + v.getLabel());
                 }
 
-                product.setStock(product.getStock() - c.getQuantity());
-                productRepo.save(product);
+                // ✅ stock variantdan kamayadi
+                v.setStock(v.getStock() - c.getQuantity());
+                variantRepo.save(v);
 
-                BigDecimal price =
-                        product.getDiscountPrice() != null &&
-                                product.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0
-                                ? product.getDiscountPrice()
-                                : product.getPrice();
-
-                BigDecimal lineTotal = price.multiply(BigDecimal.valueOf(c.getQuantity()));
+                // ✅ tier bilan line total
+                BigDecimal lineTotal = pricingService.lineTotal(v, c.getQuantity());
                 sellerSubtotal = sellerSubtotal.add(lineTotal);
 
                 OrderItem oi = new OrderItem();
                 oi.setOrder(order);
-                oi.setSellerOrder(sellerOrder);   // 🔥 MUHIM
-                oi.setProduct(product);
+                oi.setSellerOrder(sellerOrder);
+                oi.setProduct(product);     // snapshot product
+                oi.setVariant(v);           // ✅ qaysi variant ekanini saqlaymiz
                 oi.setQuantity(c.getQuantity());
-                oi.setPrice(price);
+                oi.setPrice(lineTotal);     // ✅ TOTAL (tier applied)
 
                 orderItemRepo.save(oi);
             }
-
             sellerOrder.setSubtotalAmount(sellerSubtotal);
             sellerOrderRepo.save(sellerOrder);
 
@@ -146,7 +146,6 @@ public class OrderService {
         order.setTotalAmount(finalTotal);
         orderRepo.save(order);
 
-        cartRepo.deleteByUserId(user.getId());
 
 
         return detail(order.getId());
@@ -177,22 +176,28 @@ public class OrderService {
                 orderItemRepo.findByOrderId(order.getId())
                         .stream()
                         .map(i -> {
+
                             String imageUrl = productImageRepo
                                     .findFirstByProductIdAndMainTrue(i.getProduct().getId())
                                     .map(ProductImage::getImageUrl)
                                     .orElse(null);
 
+                            ProductVariant v = i.getVariant(); // null bo‘lmasligi kerak
+
                             return new OrderItemResponse(
                                     i.getProduct().getId(),
                                     i.getProduct().getName(),
+
+                                    v != null ? v.getId() : null,
+                                    v != null ? v.getLabel() : null,
+
                                     imageUrl,
-                                    i.getPrice(),
+
+                                    i.getPrice(),      // ✅ line total (siz shu qiymatni saqlagansiz)
                                     i.getQuantity()
                             );
                         })
                         .toList();
-
-
 
         return new OrderResponse(
                 order.getId(),
@@ -206,9 +211,7 @@ public class OrderService {
                 order.getPhone(),
                 items
         );
-
     }
-
     /* ================= ADMIN: ALL ORDERS ================= */
 
     public List<OrderResponse> allOrders() {
@@ -241,15 +244,17 @@ public class OrderService {
             }
         }
 
-        // 🔄 AGAR CANCEL BO‘LSA → STOCK QAYTADI
+        // 🔄 AGAR CANCEL BO‘LSA → STOCK QAYTADI (VARIANT STOCK)
         if (order.getStatus() != OrderStatus.CANCELED && newStatus == OrderStatus.CANCELED) {
 
             List<OrderItem> items = orderItemRepo.findByOrder(order);
 
             for (OrderItem item : items) {
-                Product product = item.getProduct();
-                product.setStock(product.getStock() + item.getQuantity());
-                productRepo.save(product);
+                ProductVariant v = item.getVariant();
+                if (v != null) {
+                    v.setStock(v.getStock() + item.getQuantity());
+                    variantRepo.save(v);
+                }
             }
         }
 

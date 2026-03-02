@@ -11,8 +11,14 @@ public class OrderItemResponse {
 
     private Long productId;
     private String name;
+
+    private Long variantId;
+    private String variantLabel;
+
     private String imageUrl;
-    // 💰 BIGDECIMAL (ENG MUHIM FIX)
+
+    // ✅ BU LINE TOTAL (tier applied)
     private BigDecimal price;
+
     private int quantity;
 }

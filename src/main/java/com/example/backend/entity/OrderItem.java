@@ -33,6 +33,10 @@ public class OrderItem {
     private SellerOrder sellerOrder;
 
     private int quantity;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name="variant_id", nullable = false)
+    private ProductVariant variant;
+
 
     // 💰 SNAPSHOT PRICE (ENG MUHIM FIX)
     @Column(nullable = false, precision = 15, scale = 2)

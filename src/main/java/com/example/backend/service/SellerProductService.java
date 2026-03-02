@@ -3,9 +3,7 @@ package com.example.backend.service;
 import com.example.backend.SearchNormalizer;
 import com.example.backend.dto.*;
 import com.example.backend.entity.*;
-import com.example.backend.repository.ProductDetailImageRepository;
-import com.example.backend.repository.ProductImageRepository;
-import com.example.backend.repository.ProductRepository;
+import com.example.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,7 +20,8 @@ public class SellerProductService {
     private final ProductRepository productRepo;
     private final ProductImageRepository productImageRepo;
     private final ProductDetailImageRepository detailImageRepo;
-
+    private final ProductVariantRepository variantRepo;
+    private final VariantTierPriceRepository tierRepo;
     private final SellerService sellerService;
 
     // =============== LIST (MY PRODUCTS) ===============
@@ -56,6 +55,7 @@ public class SellerProductService {
         saveImages(product, req.getImageUrls());
         saveDetailImages(product, req.getDetailImages());
 
+        saveVariants(product, req.getVariants());
         return product.getId();
     }
 
@@ -75,6 +75,7 @@ public class SellerProductService {
 
         saveImages(product, req.getImageUrls());
         saveDetailImages(product, req.getDetailImages());
+        saveVariants(product, req.getVariants());
     }
 
     // =============== DELETE (SOFT DELETE TAVSIYA) ===============
@@ -186,6 +187,37 @@ public class SellerProductService {
         );
     }
 
+    private void saveVariants(Product product, List<ProductVariantRequest> variants) {
+
+        if (variants == null || variants.isEmpty()) return;
+
+        for (ProductVariantRequest vReq : variants) {
+
+            ProductVariant variant = new ProductVariant();
+            variant.setProduct(product);
+            variant.setLabel(vReq.getLabel());
+            variant.setPrice(vReq.getPrice());
+            variant.setDiscountPrice(vReq.getDiscountPrice());
+            variant.setStock(vReq.getStock());
+            variant.setSortOrder(vReq.getSortOrder());
+            variant.setActive(true);
+
+            variantRepo.save(variant);
+
+            // 🔥 Tier prices
+            if (vReq.getTiers() != null) {
+                for (VariantTierRequest tReq : vReq.getTiers()) {
+
+                    VariantTierPrice tier = new VariantTierPrice();
+                    tier.setVariant(variant);
+                    tier.setMinQty(tReq.getMinQty());
+                    tier.setTotalPrice(tReq.getTotalPrice());
+
+                    tierRepo.save(tier);
+                }
+            }
+        }
+    }
 
     private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());

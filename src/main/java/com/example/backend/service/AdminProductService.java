@@ -2,14 +2,14 @@ package com.example.backend.service;
 
 import com.example.backend.dto.*;
 import com.example.backend.entity.*;
-import com.example.backend.repository.ProductDetailImageRepository;
-import com.example.backend.repository.ProductImageRepository;
-import com.example.backend.repository.ProductRepository;
+import com.example.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +21,8 @@ public class AdminProductService {
     private final ProductImageRepository productImageRepo;
     private final ProductDetailImageRepository detailImageRepo;
 
-
+    private final ProductVariantRepository variantRepo;
+    private final VariantTierPriceRepository tierRepo;
     private final ProductImageRepository productImageRepository;
 
 
@@ -131,6 +132,8 @@ public class AdminProductService {
         productRepo.save(product);
         saveImages(product, req);
         saveDetailImages(product, req); // 🔥 YANGI
+        saveVariants(product, req.getVariants());
+
 
     }
 
@@ -150,6 +153,19 @@ public class AdminProductService {
 
         saveImages(product, req);
         saveDetailImages(product, req); // 🔥
+
+        // 🔥 OLD VARIANTS DELETE
+        variantRepo.findByProductId(product.getId())
+                .forEach(v -> {
+                    tierRepo.deleteAll(
+                            tierRepo.findAllByVariantIdOrderByMinQtyAsc(v.getId())
+                    );
+                });
+
+        variantRepo.deleteByProductId(product.getId());
+
+        // 🔥 SAVE NEW
+        saveVariants(product, req.getVariants());
 
     }
 
@@ -261,6 +277,38 @@ public class AdminProductService {
     }
 
 
+    private void saveVariants(Product product, List<ProductVariantRequest> variants) {
+
+        if (variants == null || variants.isEmpty()) return;
+
+        for (ProductVariantRequest vReq : variants) {
+
+            ProductVariant variant = new ProductVariant();
+            variant.setProduct(product);
+            variant.setLabel(vReq.getLabel());
+            variant.setPrice(vReq.getPrice());
+            variant.setDiscountPrice(vReq.getDiscountPrice());
+            variant.setStock(vReq.getStock());
+            variant.setSortOrder(vReq.getSortOrder());
+            variant.setActive(true);
+
+            variantRepo.save(variant);
+
+            // 🔥 Tier prices
+            if (vReq.getTiers() != null) {
+                for (VariantTierRequest tReq : vReq.getTiers()) {
+
+                    VariantTierPrice tier = new VariantTierPrice();
+                    tier.setVariant(variant);
+                    tier.setMinQty(tReq.getMinQty());
+                    tier.setTotalPrice(tReq.getTotalPrice());
+
+                    tierRepo.save(tier);
+                }
+            }
+        }
+    }
+
 
     private void map(ProductCreateRequest req, Product p) {
 
@@ -279,5 +327,7 @@ public class AdminProductService {
             throw new RuntimeException("Invalid category: " + req.getCategory());
         }
     }
+
+
 
 }

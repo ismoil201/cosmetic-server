@@ -4,13 +4,11 @@ import com.example.backend.dto.CartAddRequest;
 import com.example.backend.dto.CartItemResponse;
 import com.example.backend.dto.ProductImageResponse;
 import com.example.backend.dto.ProductResponse;
-import com.example.backend.entity.CartItem;
-import com.example.backend.entity.Product;
-import com.example.backend.entity.ProductImage;
-import com.example.backend.entity.User;
+import com.example.backend.entity.*;
 import com.example.backend.repository.CartItemRepository;
 import com.example.backend.repository.ProductImageRepository;
 import com.example.backend.repository.ProductRepository;
+import com.example.backend.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,11 +20,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CartService {
 
+
     private final CartItemRepository cartRepo;
-    private final ProductRepository productRepo;
+    private final ProductVariantRepository variantRepo;
     private final ProductImageRepository productImageRepo;
     private final UserService userService;
-
+    private final PricingService pricingService;
     /* ================= ADD TO CART ================= */
 
     @Transactional
@@ -34,37 +33,28 @@ public class CartService {
 
         User user = userService.getCurrentUser();
 
-        if (req.getQuantity() <= 0) {
-            throw new RuntimeException("Quantity must be greater than zero");
-        }
+        if (req.getQuantity() <= 0) throw new RuntimeException("Quantity must be greater than zero");
 
-        Product product = productRepo.findById(req.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+        ProductVariant v = variantRepo.findById(req.getVariantId())
+                .orElseThrow(() -> new RuntimeException("Variant not found"));
 
-        if (!product.isActive()) {
-            throw new RuntimeException("Product is not active");
-        }
+        Product product = v.getProduct();
 
-        cartRepo.findByUserIdAndProductId(user.getId(), product.getId())
+        if (!v.isActive() || !product.isActive()) throw new RuntimeException("Product is not active");
+        if (req.getQuantity() > v.getStock()) throw new RuntimeException("Not enough stock");
+
+        cartRepo.findByUserIdAndVariantId(user.getId(), v.getId())
                 .ifPresentOrElse(
                         item -> {
                             int newQty = item.getQuantity() + req.getQuantity();
-
-                            if (newQty > product.getStock()) {
-                                throw new RuntimeException("Not enough stock");
-                            }
-
+                            if (newQty > v.getStock()) throw new RuntimeException("Not enough stock");
                             item.setQuantity(newQty);
                             cartRepo.save(item);
                         },
                         () -> {
-                            if (req.getQuantity() > product.getStock()) {
-                                throw new RuntimeException("Not enough stock");
-                            }
-
                             CartItem item = new CartItem();
                             item.setUser(user);
-                            item.setProduct(product);
+                            item.setVariant(v);
                             item.setQuantity(req.getQuantity());
                             cartRepo.save(item);
                         }
@@ -82,37 +72,43 @@ public class CartService {
                 .stream()
                 .map(c -> {
 
-                    Product p = c.getProduct();
+                    ProductVariant v = c.getVariant();
+                    Product p = v.getProduct();
 
-                    // 🔥 MAIN IMAGE
+                    // main image
                     String imageUrl = productImageRepo
                             .findFirstByProductIdAndMainTrue(p.getId())
                             .map(ProductImage::getImageUrl)
                             .orElse(null);
 
+                    BigDecimal unitPrice = pricingService.unitPrice(v);
+                    BigDecimal lineTotal = pricingService.lineTotal(v, c.getQuantity());
 
-                    BigDecimal finalPrice = (p.getDiscountPrice() != null
-                            && p.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0)
-                            ? p.getDiscountPrice()
-                            : p.getPrice();
+                    // ProductResponse ichida "discountPrice" field sizda "finalPrice" sifatida ishlatilgan edi
+                    // endi variantga mos "unitPrice"ni finalPrice sifatida beramiz
+                    ProductResponse pr = new ProductResponse(
+                            p.getId(),
+                            p.getName(),
+                            p.getBrand(),
+                            v.getPrice(),
+                            unitPrice, // ✅ variant final unit
+                            p.getCategory(),
+                            p.getRatingAvg(),
+                            p.getReviewCount(),
+                            p.getSoldCount(),
+                            p.isTodayDeal(),
+                            false,
+                            v.getStock(), // ✅ variant stock
+                            List.of(new ProductImageResponse(imageUrl, true))
+                    );
 
                     return new CartItemResponse(
                             c.getId(),
-                            new ProductResponse(
-                                    p.getId(),
-                                    p.getName(),
-                                    p.getBrand(),
-                                    p.getPrice(),
-                                    finalPrice,
-                                    p.getCategory(),
-                                    p.getRatingAvg(),
-                                    p.getReviewCount(),
-                                    p.getSoldCount(),
-                                    p.isTodayDeal(),
-                                    false, // favorite (cartda shart emas)
-                                    p.getStock(),
-                                    List.of(new ProductImageResponse(imageUrl, true))
-                            ),
+                            pr,
+                            v.getId(),
+                            v.getLabel(),
+                            unitPrice,
+                            lineTotal,
                             c.getQuantity()
                     );
                 })
@@ -135,13 +131,13 @@ public class CartService {
             return;
         }
 
-        if (quantity > item.getProduct().getStock()) {
-            throw new RuntimeException("Not enough stock");
-        }
+        ProductVariant v = item.getVariant();
+        if (quantity > v.getStock()) throw new RuntimeException("Not enough stock");
 
         item.setQuantity(quantity);
         cartRepo.save(item);
     }
+
 
     /* ================= DELETE CART ITEM ================= */
 
