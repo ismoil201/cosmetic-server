@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -36,12 +37,14 @@ public class HomeFeedService {
 
         User user = userService.getCurrentUserOrNull();
 
-        // seed: har requestda biroz boshqacha bo‘lsin
-        String seed = String.valueOf(System.currentTimeMillis());
+        // ✅ STABLE seed: kuniga 1 marta o‘zgaradi (scroll/pagination sakrashini kamaytiradi)
+        String seed = (user != null)
+                ? ("u" + user.getId() + ":" + LocalDate.now())
+                : ("anon:" + LocalDate.now());
         Random rnd = new Random(seed.hashCode());
 
-        long totalProducts = productRepo.count(); // 50 ta bo‘lsa arzon
-        int maxPerBrand = (totalProducts <= 80) ? 6 : 3;
+        // ✅ Fetch size: limitga proporsional (underfill + perf muammosini kamaytiradi)
+        int fetch = Math.max(limit * 3, 60);
 
         // 0) Negative feedback
         if (user != null) {
@@ -56,8 +59,6 @@ public class HomeFeedService {
             ));
         }
 
-        // excludeIds: seen bo‘lsa exclude qilib candidate ko‘paytirishni to‘xtatmaymiz
-        // Kichik katalogda seen’ni exclude juda qattiq bo‘lishi mumkin — shuning uchun fallback bor (pastda).
         List<Long> excludeSoft = new ArrayList<>(seenSet);
         boolean excludeSoftEmpty = excludeSoft.isEmpty();
 
@@ -89,7 +90,7 @@ public class HomeFeedService {
             }
             if (!cats.isEmpty()) {
                 personalCandidates.addAll(productRepo.candidatesByCategories(
-                        cats, excludeSoft, excludeSoftEmpty, PageRequest.of(0, 200)
+                        cats, excludeSoft, excludeSoftEmpty, PageRequest.of(0, Math.min(fetch, 200))
                 ));
             }
 
@@ -103,18 +104,28 @@ public class HomeFeedService {
 
             if (!brands.isEmpty()) {
                 personalCandidates.addAll(productRepo.candidatesByBrands(
-                        brands, excludeSoft, excludeSoftEmpty, PageRequest.of(0, 200)
+                        brands, excludeSoft, excludeSoftEmpty, PageRequest.of(0, Math.min(fetch, 200))
                 ));
             }
         }
 
         // EXPLORE: discounted + popular + new (seen exclude bilan)
-        exploreCandidates.addAll(productRepo.discountedCandidates(excludeSoft, excludeSoftEmpty, PageRequest.of(0, 200)));
-        exploreCandidates.addAll(productRepo.findByActiveTrueOrderBySoldCountDesc(PageRequest.of(0, 200)).getContent());
-        exploreCandidates.addAll(productRepo.findByActiveTrueOrderByCreatedAtDesc(PageRequest.of(0, 120)).getContent());
+        exploreCandidates.addAll(productRepo.discountedCandidates(
+                excludeSoft, excludeSoftEmpty, PageRequest.of(0, Math.min(fetch, 200))
+        ));
+        exploreCandidates.addAll(productRepo.findByActiveTrueOrderBySoldCountDesc(
+                PageRequest.of(0, Math.min(fetch, 200))
+        ).getContent());
+        exploreCandidates.addAll(productRepo.findByActiveTrueOrderByCreatedAtDesc(
+                PageRequest.of(0, Math.min(fetch, 120))
+        ).getContent());
+
+        // ✅ maxPerBrand: count() yo‘q — pool size bo‘yicha taxmin
+        int poolSizeGuess = personalCandidates.size() + exploreCandidates.size();
+        int maxPerBrand = (poolSizeGuess <= 80) ? 6 : 3;
 
         // 4) scoring
-        double seenPenalty = calcSeenPenalty(totalProducts); // kichik katalogda yumshoq
+        double seenPenalty = calcSeenPenalty(poolSizeGuess); // kichik katalogda yumshoq
         List<ScoredProduct> personalScored = scoreAndSort(personalCandidates, catScore, brandScore, seenSet, seenPenalty);
         List<ScoredProduct> exploreScored = scoreAndSort(exploreCandidates, catScore, brandScore, seenSet, seenPenalty);
 
@@ -133,14 +144,18 @@ public class HomeFeedService {
 
         // 6) Fallback: seen exclude sabab yetmasa -> seen ni qaytaramiz (exclude yo‘q)
         if (blended.size() < limit) {
-            // explore poolni seen exclude-siz to‘ldiramiz
-            List<Product> more = productRepo.findByActiveTrueOrderBySoldCountDesc(PageRequest.of(0, 300)).getContent();
-            List<ScoredProduct> moreScored = scoreAndSort(more, catScore, brandScore, Collections.emptySet(), 0.0);
+            List<Product> more = productRepo.findByActiveTrueOrderBySoldCountDesc(
+                    PageRequest.of(0, Math.max(fetch * 2, 120))
+            ).getContent();
+
+            List<ScoredProduct> moreScored = scoreAndSort(
+                    more, catScore, brandScore, Collections.emptySet(), 0.0
+            );
 
             blended = mergeFill(blended, moreScored, limit, maxPerBrand);
         }
 
-        // 7) Seed shuffle: top pool ichida aralashtirish (takrorni kamaytiradi)
+        // 7) Top pool shuffle
         blended = shuffleTopPool(blended, limit, rnd);
 
         // 8) impressions log
@@ -149,16 +164,14 @@ public class HomeFeedService {
             eventTrackingService.logImpressions(user, ids);
         }
 
-        // 9) toCard
-        return blended.stream()
-                .limit(limit)
-                .map(p -> productService.toCardPublic(p, user))
-                .toList();
+        // 9) toCard (✅ batch: N+1 yo‘q)
+        List<Product> picked = blended.stream().limit(limit).toList();
+        return productService.toCardsPublic(picked, user);
     }
 
-    private double calcSeenPenalty(long totalProducts) {
-        // 50 ta catalogda 20 juda qattiq. 8-12 yaxshi.
-        if (totalProducts <= 80) return 10.0;
+    private double calcSeenPenalty(int poolSizeGuess) {
+        // kichik katalogda yumshoq
+        if (poolSizeGuess <= 80) return 10.0;
         return 20.0;
     }
 
@@ -214,7 +227,7 @@ public class HomeFeedService {
                 && discount.compareTo(price) < 0) {
 
             BigDecimal pct = price.subtract(discount)
-                    .divide(price, 6, RoundingMode.HALF_UP); // 0..1
+                    .divide(price, 6, RoundingMode.HALF_UP);
             discountBoost = pct.doubleValue() * 10.0;
         }
 
@@ -245,16 +258,18 @@ public class HomeFeedService {
                                                       int exploreCount,
                                                       int maxPerBrand) {
 
-        List<Product> out = new ArrayList<>();
-        Set<Long> used = new HashSet<>();
+        int target = personalCount + exploreCount;
+
+        List<Product> out = new ArrayList<>(target);
+        Set<Long> used = new HashSet<>(target * 2);
         Map<String, Integer> brandCount = new HashMap<>();
 
         addWithBrandDiversity(out, used, brandCount, personal, personalCount, maxPerBrand);
         addWithBrandDiversity(out, used, brandCount, explore, exploreCount, maxPerBrand);
 
         // agar hali ham kam bo‘lsa, explore’dan yana to‘ldiramiz
-        if (out.size() < personalCount + exploreCount) {
-            addWithBrandDiversity(out, used, brandCount, explore, (personalCount + exploreCount) - out.size(), maxPerBrand);
+        if (out.size() < target) {
+            addWithBrandDiversity(out, used, brandCount, explore, target - out.size(), maxPerBrand);
         }
 
         return out;
@@ -267,19 +282,24 @@ public class HomeFeedService {
                                        int need,
                                        int maxPerBrand) {
 
+        if (need <= 0 || scored == null || scored.isEmpty()) return;
+
         for (ScoredProduct sp : scored) {
             if (need <= 0) break;
             Product p = sp.p;
             if (p == null || p.getId() == null) continue;
-            if (used.contains(p.getId())) continue;
+            if (!used.add(p.getId())) continue;
 
             String brand = (p.getBrand() == null) ? "" : p.getBrand().trim().toLowerCase();
             int cnt = brandCount.getOrDefault(brand, 0);
 
-            if (cnt >= maxPerBrand) continue;
+            if (cnt >= maxPerBrand) {
+                // revert used.add
+                used.remove(p.getId());
+                continue;
+            }
 
             out.add(p);
-            used.add(p.getId());
             brandCount.put(brand, cnt + 1);
             need--;
         }
@@ -293,7 +313,7 @@ public class HomeFeedService {
                                     int limit,
                                     int maxPerBrand) {
 
-        LinkedHashMap<Long, Product> uniq = new LinkedHashMap<>();
+        LinkedHashMap<Long, Product> uniq = new LinkedHashMap<>(limit * 2);
         Map<String, Integer> brandCount = new HashMap<>();
 
         for (Product p : base) {
@@ -337,7 +357,7 @@ public class HomeFeedService {
     private List<Product> shuffleTopPool(List<Product> list, int limit, Random rnd) {
         if (list == null || list.isEmpty()) return list;
 
-        int k = Math.min(list.size(), Math.max(limit * 2, 30)); // top 30 yoki top 2*limit ichida
+        int k = Math.min(list.size(), Math.max(limit * 2, 30));
         List<Product> top = new ArrayList<>(list.subList(0, k));
         Collections.shuffle(top, rnd);
 

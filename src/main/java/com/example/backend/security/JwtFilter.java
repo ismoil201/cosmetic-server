@@ -18,8 +18,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
-import static io.jsonwebtoken.Jwts.claims;
-
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
@@ -33,35 +31,21 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String path = request.getRequestURI();
-
-        if (
-                path.equals("/api/products") ||
-                        path.startsWith("/api/products/") ||
-                        path.equals("/api/products/today-deals") ||
-                        path.startsWith("/api/reviews/product/") ||
-                        path.startsWith("/api/auth") ||
-                        path.startsWith("/api/home")  ||
-                        path.startsWith("/v3/api-docs") ||           // ✅ swagger
-                        path.startsWith("/swagger-ui") ||            // ✅ swagger
-                        path.equals("/swagger-ui.html") ||           // ✅ swagger shortcut
-                        path.equals("/error")// ✅ ADD
-
-        ) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
+        // ✅ IMPORTANT:
+        // Old code skipped public endpoints entirely, so optional-auth on public endpoints broke.
+        // New behavior: ALWAYS attempt auth if Bearer token exists, even on permitAll routes.
 
         String authHeader = request.getHeader("Authorization");
 
+        // No token -> proceed as anonymous (works for both public and protected; protected will be blocked by SecurityConfig)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(7);
+        String token = authHeader.substring(7).trim();
 
+        // token blank/null -> proceed
         if (token.isBlank() || token.equalsIgnoreCase("null")) {
             filterChain.doFilter(request, response);
             return;
@@ -70,33 +54,35 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             String email = jwtService.extractEmail(token);
             String role = jwtService.extractRole(token);
-            if (role == null || role.isBlank()) role = "USER";
-            role = role.toUpperCase();
-            if (role.startsWith("ROLE_")) role = role.substring(5);
 
-            Authentication existing = SecurityContextHolder.getContext().getAuthentication();
-            boolean missing = existing == null;
-            boolean anonymous = existing instanceof AnonymousAuthenticationToken;
+            if (email != null && !email.isBlank()) {
+                if (role == null || role.isBlank()) role = "USER";
+                role = role.trim().toUpperCase();
+                if (role.startsWith("ROLE_")) role = role.substring(5);
 
-            if (missing || anonymous) {
-                UsernamePasswordAuthenticationToken authentication =
-                        UsernamePasswordAuthenticationToken.authenticated(
-                                email,
-                                null,
-                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                        );
+                Authentication existing = SecurityContextHolder.getContext().getAuthentication();
+                boolean missing = existing == null;
+                boolean anonymous = existing instanceof AnonymousAuthenticationToken;
 
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                if (missing || anonymous) {
+                    UsernamePasswordAuthenticationToken authentication =
+                            UsernamePasswordAuthenticationToken.authenticated(
+                                    email,
+                                    null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                            );
+
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
             }
 
         } catch (Exception e) {
-            SecurityContextHolder.clearContext(); // 🔥 MUHIM
+            // Invalid/expired token -> clear context and continue.
+            // Protected endpoints will still fail later due to SecurityConfig.
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
     }
-
-
-
 }

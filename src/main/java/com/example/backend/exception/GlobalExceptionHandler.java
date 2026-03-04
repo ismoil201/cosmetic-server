@@ -10,6 +10,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // ✅ 404 - NotFoundException (ENG MUHIM: RuntimeException'dan oldin alohida ushlaymiz)
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<ApiResponse<?>> handleNotFound(NotFoundException e) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     // ✅ Runtime xatolar (400)
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<?>> handleRuntime(RuntimeException e) {
@@ -24,7 +32,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(new ApiResponse<>(false, "OUT_OF_STOCK", null));
-        // yoki: .body(ApiResponse.error("OUT_OF_STOCK"))  (agar message shu bo‘lsin desang)
+        // yoki: .body(ApiResponse.error("OUT_OF_STOCK"))
     }
 
     // ✅ boshqa hamma xatolar (500)

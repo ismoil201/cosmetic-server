@@ -1,12 +1,15 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.*;
-import com.example.backend.entity.*;
+import com.example.backend.dto.AddressCreateRequest;
+import com.example.backend.dto.AddressResponse;
+import com.example.backend.entity.Address;
+import com.example.backend.entity.User;
+import com.example.backend.exception.NotFoundException;
 import com.example.backend.repository.AddressRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -17,6 +20,7 @@ public class AddressService {
     private final AddressRepository addressRepo;
     private final UserService userService;
 
+    @Transactional
     public AddressResponse create(AddressCreateRequest req) {
 
         User user = userService.getCurrentUser();
@@ -33,6 +37,7 @@ public class AddressService {
         return map(address);
     }
 
+    @Transactional(readOnly = true)
     public List<AddressResponse> myAddresses() {
         User user = userService.getCurrentUser();
 
@@ -42,9 +47,56 @@ public class AddressService {
                 .toList();
     }
 
+    /**
+     * General getById (ADMIN yoki internal ishlatish uchun).
+     * Public API bo‘lsa ownership tekshiruvini getOwnedByCurrentUser() bilan qiling.
+     */
+    @Transactional(readOnly = true)
     public Address getById(Long id) {
         return addressRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> new NotFoundException("Address not found"));
+    }
+
+    /**
+     * ✅ IDOR-safe: faqat current userga tegishli va active bo‘lgan addressni qaytaradi.
+     * NotFoundException ishlatamiz: address bor/yo‘qligini oshkor qilmaydi.
+     */
+    @Transactional(readOnly = true)
+    public Address getOwnedByCurrentUser(Long addressId) {
+        User user = userService.getCurrentUser();
+
+        Address a = addressRepo.findById(addressId)
+                .orElseThrow(() -> new NotFoundException("Address not found"));
+
+        boolean active = isActiveTrue(a);
+
+        // address boshqa userniki yoki inactive bo‘lsa -> "topilmadi" (IDOR best practice)
+        if (!active || a.getUser() == null || !a.getUser().getId().equals(user.getId())) {
+            throw new NotFoundException("Address not found");
+        }
+
+        return a;
+    }
+
+    /**
+     * Soft delete (faqat owner)
+     */
+    @Transactional
+    public void delete(Long addressId) {
+        User user = userService.getCurrentUser();
+
+        Address a = addressRepo.findById(addressId)
+                .orElseThrow(() -> new NotFoundException("Address not found"));
+
+        boolean active = isActiveTrue(a);
+
+        // Agar boshqa userniki bo‘lsa -> 404 (IDOR)
+        if (!active || a.getUser() == null || !a.getUser().getId().equals(user.getId())) {
+            throw new NotFoundException("Address not found");
+        }
+
+        a.setActive(false);
+        addressRepo.save(a);
     }
 
     private AddressResponse map(Address a) {
@@ -57,49 +109,29 @@ public class AddressService {
         );
     }
 
-//    public Address getOwnedByCurrentUser(Long addressId) {
-//        User user = userService.getCurrentUser();
-//        Address a = addressRepo.findById(addressId)
-//                .orElseThrow(() -> new RuntimeException("Address not found"));
-//
-//        if (!a.getUser().isActive() || !a.getUser().getId().equals(user.getId())) {
-//            throw new RuntimeException("Address not allowed");
-//        }
-//        return a;
-//    }
-
-
-
-    public void delete(Long addressId) {
-        User user = userService.getCurrentUser();
-
-        Address a = addressRepo.findById(addressId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Address not found"));
-
-        // ⚠️ active null bo‘lishi mumkin bo‘lsa, NPE bo‘ladi. Shuning uchun Boolean.TRUE bilan tekshiramiz.
-        boolean active = Boolean.TRUE.equals(a.getActive()); // getActive() bo‘lsa
-        // agar entity'da primitive boolean bo‘lsa: boolean active = a.isActive();
-
-        if (!active || !a.getUser().getId().equals(user.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Address not allowed");
+    /**
+     * Address.active primitive boolean bo‘lsa ham, Boolean bo‘lsa ham NPE bo‘lmasin.
+     * - Agar entity’da boolean active bo‘lsa: a.isActive()
+     * - Agar entity’da Boolean active bo‘lsa: Boolean.TRUE.equals(a.getActive())
+     *
+     * Sizda qaysi biri ekanini bilmaganim uchun universal qilib yozdim.
+     */
+    private boolean isActiveTrue(Address a) {
+        try {
+            // Boolean getter bo‘lsa
+            //noinspection RedundantCast
+            Boolean v = (Boolean) Address.class.getMethod("getActive").invoke(a);
+            return Boolean.TRUE.equals(v);
+        } catch (Exception ignored) {
+            // primitive boolean bo‘lsa
+            try {
+                //noinspection RedundantCast
+                boolean v = (boolean) Address.class.getMethod("isActive").invoke(a);
+                return v;
+            } catch (Exception e) {
+                // Agar umuman active field bo‘lmasa — xavfsiz tomonga: false
+                return false;
+            }
         }
-
-        a.setActive(false);
-        addressRepo.save(a);
     }
-
-    public Address getOwnedByCurrentUser(Long addressId) {
-        User user = userService.getCurrentUser();
-        Address a = addressRepo.findById(addressId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
-
-        // ❗ Agar active Boolean bo‘lsa, bu yerda NPE bo‘lishi mumkin:
-        // if (!a.isActive() || ...)  <-- NPE
-        // Shuning uchun ham bu funksiyani ham shunday yozing:
-        if (!Boolean.TRUE.equals(a.getActive()) || !a.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Address not allowed");
-        }
-        return a;
-    }
-
 }

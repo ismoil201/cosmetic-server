@@ -3,6 +3,7 @@ package com.example.backend.service;
 import com.example.backend.dto.ProductCardResponse;
 import com.example.backend.dto.ProductRecommendResponse;
 import com.example.backend.entity.*;
+import com.example.backend.exception.NotFoundException;
 import com.example.backend.repository.EventLogRepository;
 import com.example.backend.repository.ProductRepository;
 import com.example.backend.repository.UserInterestRepository;
@@ -40,7 +41,7 @@ public class ProductRecommendService {
         if (user != null) negativeFeedbackService.applyIfNeeded(user);
 
         Product base = productRepo.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found: " + productId));
+                .orElseThrow(() -> new NotFoundException("Product not found: " + productId));
 
         // seed fallback
         if (seed == null || seed.isBlank()) seed = String.valueOf(System.currentTimeMillis());
@@ -60,15 +61,8 @@ public class ProductRecommendService {
         List<Product> others = buildOthers(base, user, othersLimit, similar, seen, seed);
 
         // to card
-        List<ProductCardResponse> simCards = similar.stream()
-                .limit(similarLimit)
-                .map(p -> productService.toCardPublic(p, user))
-                .toList();
-
-        List<ProductCardResponse> otherCards = others.stream()
-                .limit(othersLimit)
-                .map(p -> productService.toCardPublic(p, user))
-                .toList();
+        List<ProductCardResponse> simCards = productService.toCardsPublic(similar.stream().limit(similarLimit).toList(), user);
+        List<ProductCardResponse> otherCards = productService.toCardsPublic(others.stream().limit(othersLimit).toList(), user);
 
         return new ProductRecommendResponse(simCards, otherCards);
     }
@@ -77,11 +71,11 @@ public class ProductRecommendService {
      * Similar: category + brand + price band yaqin + popularity/discount bilan rerank
      */
     private List<Product> buildSimilar(Product base, int limit) {
+        if (limit <= 0) return List.of();
 
         Set<Long> exclude = new HashSet<>();
         exclude.add(base.getId());
 
-        // candidates yig‘amiz
         List<Product> candidates = new ArrayList<>();
 
         // 1) category + price band (±15%)
@@ -92,16 +86,16 @@ public class ProductRecommendService {
 
             candidates.addAll(productRepo.activeByCategoryAndPriceBand(
                     base.getCategory(), min, max,
-                    new ArrayList<>(exclude), exclude.isEmpty(),
+                    new ArrayList<>(exclude), false,
                     PageRequest.of(0, 160)
             ));
         }
 
-        // 2) category top (ko‘proq olish)
+        // 2) category top
         if (base.getCategory() != null) {
             candidates.addAll(productRepo.activeByCategories(
                     List.of(base.getCategory()),
-                    new ArrayList<>(exclude), exclude.isEmpty(),
+                    new ArrayList<>(exclude), false,
                     PageRequest.of(0, 200)
             ));
         }
@@ -110,16 +104,16 @@ public class ProductRecommendService {
         if (base.getBrand() != null && !base.getBrand().isBlank()) {
             candidates.addAll(productRepo.activeByBrands(
                     List.of(base.getBrand().trim().toLowerCase()),
-                    new ArrayList<>(exclude), exclude.isEmpty(),
+                    new ArrayList<>(exclude), false,
                     PageRequest.of(0, 200)
             ));
         }
 
-        // uniq + score + top
         return scoreSimilarAndPick(base, candidates, limit);
     }
 
     private List<Product> scoreSimilarAndPick(Product base, List<Product> candidates, int limit) {
+        if (limit <= 0) return List.of();
 
         Map<Long, Product> uniq = new LinkedHashMap<>();
         for (Product p : candidates) {
@@ -133,55 +127,47 @@ public class ProductRecommendService {
 
         record SP(Product p, double s) {}
 
-        List<SP> scored = new ArrayList<>();
+        List<SP> scored = new ArrayList<>(uniq.size());
         for (Product p : uniq.values()) {
-
             double s = 0.0;
 
-            // category match
             if (base.getCategory() != null && p.getCategory() == base.getCategory()) s += 3.0;
 
-            // brand match
             if (base.getBrand() != null && p.getBrand() != null) {
                 if (base.getBrand().trim().equalsIgnoreCase(p.getBrand().trim())) s += 2.0;
             }
 
-            // price closeness
             if (basePrice != null && p.getPrice() != null && basePrice.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal diff = p.getPrice().subtract(basePrice).abs();
-                BigDecimal ratio = diff.divide(basePrice, 6, RoundingMode.HALF_UP); // 0..?
-                double closeness = Math.max(0, 1.0 - ratio.doubleValue()); // 1 best
+                BigDecimal ratio = diff.divide(basePrice, 6, RoundingMode.HALF_UP);
+                double closeness = Math.max(0, 1.0 - ratio.doubleValue());
                 s += closeness * 2.0;
             }
 
-            // discount boost
             s += discountBoost(p);
 
-            // popularity
             double popularity = (p.getSoldCount() * 3.0) + p.getViewCount();
             s += 0.02 * popularity;
 
-            // today deal
             if (p.isTodayDeal()) s += 2.5;
 
-            // stock penalty
             if (p.getStock() <= 0) s -= 50.0;
 
             scored.add(new SP(p, s));
         }
 
-        scored.sort((a, b) -> Double.compare(b.s, a.s));
+        scored.sort((a, b) -> Double.compare(b.s(), a.s()));
 
-        List<Product> out = new ArrayList<>();
+        List<Product> out = new ArrayList<>(limit);
         for (SP sp : scored) {
             if (out.size() >= limit) break;
-            out.add(sp.p);
+            out.add(sp.p());
         }
         return out;
     }
 
     /**
-     * Others: user interest (category/brand) + trending/discount/new/hit mix + seen+dedupe
+     * Others: interest + trending/discount/new/hit mix + seen+dedupe
      */
     private List<Product> buildOthers(Product base,
                                       User user,
@@ -190,6 +176,8 @@ public class ProductRecommendService {
                                       Set<Long> seen,
                                       String seed) {
 
+        if (limit <= 0) return List.of();
+
         // 0) hard exclude (doim): base + similar
         Set<Long> excludeHard = new HashSet<>();
         excludeHard.add(base.getId());
@@ -197,32 +185,26 @@ public class ProductRecommendService {
             if (p != null && p.getId() != null) excludeHard.add(p.getId());
         }
 
-        // 1) soft exclude: hard + seen (agar seen bo‘lsa)
+        // 1) soft exclude: hard + seen
         Set<Long> excludeSoft = new HashSet<>(excludeHard);
         if (seen != null) excludeSoft.addAll(seen);
 
         // 2) 1-urinish: excludeSoft
         List<Product> first = buildOthersInternal(user, limit, seed, excludeSoft);
+        if (first.size() >= limit) return first;
 
-        // 3) agar yetmasa -> 2-urinish: excludeHard (seen ni qaytarib yuboramiz)
-        if (first.size() < limit) {
-            List<Product> second = buildOthersInternal(user, limit, seed, excludeHard);
+        // 3) fallback: excludeHard (seen ni bo‘shatamiz)
+        List<Product> second = buildOthersInternal(user, limit, seed, excludeHard);
 
-            // merge qilib dedupe qilib qaytaramiz (avval first, keyin second)
-            LinkedHashMap<Long, Product> merged = new LinkedHashMap<>();
-            for (Product p : first) {
-                if (p != null && p.getId() != null) merged.putIfAbsent(p.getId(), p);
-            }
-            for (Product p : second) {
-                if (p != null && p.getId() != null) merged.putIfAbsent(p.getId(), p);
-            }
-            return merged.values().stream().limit(limit).toList();
+        LinkedHashMap<Long, Product> merged = new LinkedHashMap<>(limit * 2);
+        for (Product p : first) {
+            if (p != null && p.getId() != null) merged.putIfAbsent(p.getId(), p);
         }
-
-        return first;
+        for (Product p : second) {
+            if (p != null && p.getId() != null) merged.putIfAbsent(p.getId(), p);
+        }
+        return merged.values().stream().limit(limit).toList();
     }
-
-
 
     private double discountBoost(Product p) {
         BigDecimal price = p.getPrice();
@@ -250,7 +232,7 @@ public class ProductRecommendService {
             uniq.putIfAbsent(p.getId(), p);
         }
 
-        List<SP> scored = new ArrayList<>();
+        List<SP> scored = new ArrayList<>(uniq.size());
         for (Product p : uniq.values()) {
 
             double c = 0.0;
@@ -273,12 +255,15 @@ public class ProductRecommendService {
             scored.add(new SP(p, s));
         }
 
-        scored.sort((a, bb) -> Double.compare(bb.score, a.score));
+        scored.sort((a, bb) -> Double.compare(bb.score(), a.score()));
         return scored;
     }
 
     /**
-     * 70/30 + seed shuffle + brand diversity (max 3 per brand)
+     * 70/30 + seed shuffle + brand diversity
+     *
+     * BUG-1: personal bo‘sh bo‘lsa explore limitning hammasini to‘ldiradi
+     * BUG-2: O(n^2) stream anyMatch o‘rniga set ishlatildi
      */
     private List<Product> blendWithBrandDiversity(List<SP> personal,
                                                   List<SP> explore,
@@ -286,19 +271,29 @@ public class ProductRecommendService {
                                                   String seed,
                                                   int maxPerBrand) {
 
-        int personalCount = (int) Math.round(limit * 0.7);
-        int exploreCount = limit - personalCount;
+        boolean hasPersonal = personal != null && !personal.isEmpty();
 
-        List<Product> merged = new ArrayList<>();
-        Set<Long> used = new HashSet<>();
+        int personalCount = hasPersonal ? (int) Math.round(limit * 0.7) : 0;
+        int exploreCount  = limit - personalCount;
+
+        List<Product> merged = new ArrayList<>(limit * 2);
+        Set<Long> used = new HashSet<>(limit * 2);
 
         addTop(merged, used, personal, personalCount);
         addTop(merged, used, explore, exploreCount);
 
-        long s = seed == null ? System.currentTimeMillis() : seed.hashCode();
-        Collections.shuffle(merged, new Random(s));
+        // agar personal kam bo‘lsa, explore bilan to‘ldirib yuboramiz
+        int remaining = limit - merged.size();
+        if (remaining > 0) {
+            addTop(merged, used, personal, remaining);
+            remaining = limit - merged.size();
+            if (remaining > 0) addTop(merged, used, explore, remaining);
+        }
 
-        List<Product> out = new ArrayList<>();
+        long shuffleSeed = (seed != null) ? ((long) seed.hashCode() & 0xFFFFFFFFL) : System.currentTimeMillis();
+        Collections.shuffle(merged, new Random(shuffleSeed));
+
+        List<Product> out = new ArrayList<>(limit);
         Map<String, Integer> brandCount = new HashMap<>();
 
         for (Product p : merged) {
@@ -313,18 +308,25 @@ public class ProductRecommendService {
             brandCount.put(brand, cnt + 1);
         }
 
-        // fill if needed
+        // diversity sabab tushib qolsa to‘ldirib yubor (BUG-2 fix: set bilan)
         if (out.size() < limit) {
+            Set<Long> outIds = new HashSet<>();
+            for (Product p : out) outIds.add(p.getId());
+
             for (Product p : merged) {
                 if (out.size() >= limit) break;
                 if (p == null || p.getId() == null) continue;
-                boolean exists = out.stream().anyMatch(x -> x.getId().equals(p.getId()));
-                if (!exists) out.add(p);
+                if (outIds.add(p.getId())) out.add(p);
             }
         }
 
         return out;
     }
+
+    /**
+     * BUG-1 FIX: explore pool endi limitga proporsional katta olinadi.
+     * Eski limitlar (8/10/10/4) -> underfill qilardi.
+     */
     private List<Product> buildOthersInternal(User user,
                                               int limit,
                                               String seed,
@@ -333,7 +335,6 @@ public class ProductRecommendService {
         List<Long> excludeIds = new ArrayList<>(excludeSet);
         int excludeEmpty = excludeIds.isEmpty() ? 1 : 0;
 
-        // interest maps
         Map<String, Double> catScore = new HashMap<>();
         Map<String, Double> brandScore = new HashMap<>();
 
@@ -349,7 +350,6 @@ public class ProductRecommendService {
                         if (x.getKey() != null) brandScore.put(x.getKey().trim().toLowerCase(), x.getScore());
                     });
 
-            // top categories
             List<String> catKeys = interestRepo.topKeys(user, InterestType.CATEGORY, PageRequest.of(0, 4));
             List<Category> cats = new ArrayList<>();
             for (String k : catKeys) {
@@ -363,7 +363,6 @@ public class ProductRecommendService {
                 ));
             }
 
-            // top brands
             List<String> brands = interestRepo.topKeys(user, InterestType.BRAND, PageRequest.of(0, 4))
                     .stream().filter(Objects::nonNull)
                     .map(s -> s.trim().toLowerCase())
@@ -377,31 +376,34 @@ public class ProductRecommendService {
             }
         }
 
-        // Explore: Temu-style mix
-        explore.addAll(productRepo.hitsShuffledExclude(seed, excludeIds, excludeEmpty, Math.min(8, limit)));
-        explore.addAll(productRepo.discountsShuffledExclude(seed, excludeIds, excludeEmpty, Math.min(10, limit)));
-        explore.addAll(productRepo.newArrivalsExclude(excludeIds, excludeEmpty, Math.min(10, limit)));
-        explore.addAll(productRepo.popularExclude(excludeIds, excludeEmpty, PageRequest.of(0, 4)).getContent());
+        // ✅ Explore: limitga proporsional kandidat olish (headroom uchun)
+        int exploreFetch = Math.max(limit * 3, 60);
+        int perBucket = Math.max(exploreFetch / 4, limit); // har bucket kamida limitcha olsin
 
-        // score and blend 70/30
+        explore.addAll(productRepo.hitsShuffledExclude(seed, excludeIds, excludeEmpty, perBucket));
+        explore.addAll(productRepo.discountsShuffledExclude(seed, excludeIds, excludeEmpty, perBucket));
+        explore.addAll(productRepo.newArrivalsExclude(excludeIds, excludeEmpty, perBucket));
+        explore.addAll(productRepo.popularExclude(excludeIds, excludeEmpty, PageRequest.of(0, perBucket)).getContent());
+
         List<SP> personalScored = scoreByInterest(personal, catScore, brandScore);
         List<SP> exploreScored = scoreByInterest(explore, catScore, brandScore);
 
-        // ✅ kichik catalog uchun brand limit yumshoq bo‘lsin
-        long total = productRepo.count(); // 50 ta bo‘lsa bu arzon
-        int maxPerBrand = (total <= 80) ? 6 : 3;
+        // ✅ BUG-4 FIX: count() yo‘q — kandidat pool size bo‘yicha
+        int poolSize = personalScored.size() + exploreScored.size();
+        int maxPerBrand = (poolSize <= 80) ? 6 : 3;
 
         return blendWithBrandDiversity(personalScored, exploreScored, limit, seed, maxPerBrand);
     }
 
     private void addTop(List<Product> out, Set<Long> used, List<SP> scored, int need) {
+        if (need <= 0 || scored == null || scored.isEmpty()) return;
+
         for (SP sp : scored) {
             if (need <= 0) break;
-            Product p = sp.p;
+            Product p = sp.p();
             if (p == null || p.getId() == null) continue;
-            if (used.contains(p.getId())) continue;
+            if (!used.add(p.getId())) continue;
             out.add(p);
-            used.add(p.getId());
             need--;
         }
     }

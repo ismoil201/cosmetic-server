@@ -6,7 +6,16 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 @Entity
-@Table(name = "products")
+@Table(
+        name = "products",
+        indexes = {
+                @Index(name = "idx_products_category", columnList = "category"),
+                @Index(name = "idx_products_brand", columnList = "brand"),
+                @Index(name = "idx_products_sold_count", columnList = "sold_count"),
+                @Index(name = "idx_products_created_at", columnList = "created_at"),
+                @Index(name = "idx_products_active", columnList = "active")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor

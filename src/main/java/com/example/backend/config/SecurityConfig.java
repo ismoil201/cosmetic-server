@@ -28,27 +28,24 @@ public class SecurityConfig {
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-
                         .requestMatchers("/api/auth/**").permitAll()
-
-                        // ✅ HOME (PUBLIC)
                         .requestMatchers("/api/home/**").permitAll()
-
-                        // ✅ PRODUCTS (PUBLIC)
                         .requestMatchers("/api/products/**").permitAll()
                         .requestMatchers("/api/reviews/product/**").permitAll()
-
-                        // ✅ BANNERS (PUBLIC)
                         .requestMatchers("/api/banners/**").permitAll()
+
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/seller/**").hasRole("SELLER")
 
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html").permitAll()
-
-                        .requestMatchers("/error").permitAll()
+                                "/swagger-ui.html",
+                                "/error"
+                        ).permitAll()
 
                         .anyRequest().authenticated()
+
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 

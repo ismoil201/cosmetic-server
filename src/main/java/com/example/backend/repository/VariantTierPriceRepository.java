@@ -5,7 +5,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface VariantTierPriceRepository extends JpaRepository<VariantTierPrice, Long> {
@@ -25,5 +27,13 @@ public interface VariantTierPriceRepository extends JpaRepository<VariantTierPri
     """)
     List<VariantTierPrice> findBestTier(@Param("variantId") Long variantId, @Param("qty") int qty, Pageable pageable);
 
+    @Query("""
+      select t from VariantTierPrice t
+      where t.variant.id in :variantIds
+      order by t.variant.id asc, t.minQty asc
+    """)
+    List<VariantTierPrice> findAllByVariantIdInOrderByVariantIdAscMinQtyAsc(@Param("variantIds") Collection<Long> variantIds);
 
+    @Transactional
+    void deleteByVariantIdIn(List<Long> variantIds);
 }

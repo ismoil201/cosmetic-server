@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -17,39 +18,38 @@ import java.util.List;
 public class HomeService {
 
     private final ProductRepository productRepo;
-    private final ProductService productService; // sizning toCard mapping ishlatish uchun
+    private final ProductService productService;
     private final UserService userService;
 
     public HomeResponse home(int limit, Pageable pageable, String seed) {
 
         User user = userService.getCurrentUserOrNull();
-        List<Long> used = new java.util.ArrayList<>();
+        List<Long> used = new ArrayList<>();
 
         // 1) Hits
-        List<Product> hitsP = productRepo.hitsShuffledExclude(seed, used, used.isEmpty()?1:0, limit);
+        List<Product> hitsP = productRepo.hitsShuffledExclude(seed, used, used.isEmpty() ? 1 : 0, limit);
         used.addAll(hitsP.stream().map(Product::getId).toList());
-        var hits = hitsP.stream().map(p -> productServiceToCard(p, user)).toList();
+        List<ProductCardResponse> hits = productService.toCardsPublic(hitsP, user);
 
         // 2) Discounts
-        List<Product> discP = productRepo.discountsShuffledExclude(seed, used, used.isEmpty()?1:0, limit);
+        List<Product> discP = productRepo.discountsShuffledExclude(seed, used, used.isEmpty() ? 1 : 0, limit);
         used.addAll(discP.stream().map(Product::getId).toList());
-        var discounts = discP.stream().map(p -> productServiceToCard(p, user)).toList();
+        List<ProductCardResponse> discounts = productService.toCardsPublic(discP, user);
 
         // 3) New
-        List<Product> newP = productRepo.newArrivalsExclude(used, used.isEmpty()?1:0, limit);
+        List<Product> newP = productRepo.newArrivalsExclude(used, used.isEmpty() ? 1 : 0, limit);
         used.addAll(newP.stream().map(Product::getId).toList());
-        var newArrivals = newP.stream().map(p -> productServiceToCard(p, user)).toList();
+        List<ProductCardResponse> newArrivals = productService.toCardsPublic(newP, user);
 
-        // 4) Popular (page)
         // 4) Popular (page) - EXCLUDE QILMAYMIZ ✅
         Page<Product> popP = productRepo.findByActiveTrueOrderBySoldCountDesc(pageable);
-        var popular = popP.map(p -> productServiceToCard(p, user));
+
+        // Page -> List -> batch -> PageImpl
+        List<ProductCardResponse> popularCards = productService.toCardsPublic(popP.getContent(), user);
+        Page<ProductCardResponse> popular = new org.springframework.data.domain.PageImpl<>(
+                popularCards, popP.getPageable(), popP.getTotalElements()
+        );
 
         return new HomeResponse(hits, discounts, newArrivals, popular);
-    }
-
-    // sizning ProductService ichidagi toCard private, shuni ko‘chiring yoki public qiling:
-    public ProductCardResponse productServiceToCard(Product p, User user) {
-        return productService.toCardPublic(p, user); // pastda aytaman
     }
 }

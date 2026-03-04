@@ -37,6 +37,14 @@ dependencies {
 
     // MySQL
     runtimeOnly("com.mysql:mysql-connector-j:8.4.0")
+
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.12.0")
+
+
+    // ✅ SHU QATOR MUHIM (xatoni tuzatadi)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
 }
 tasks.withType<Test> {
     useJUnitPlatform()

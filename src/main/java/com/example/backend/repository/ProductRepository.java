@@ -228,7 +228,6 @@ WHERE p.active = 1
       select p from Product p
       where p.active = true
         and p.discountPrice is not null
-        and p.discountPrice > 0
         and p.discountPrice < p.price
         and (:excludeEmpty = true or p.id not in :exclude)
       order by ((p.price - p.discountPrice) / p.price) desc, (p.soldCount * 3 + p.viewCount) desc
@@ -282,5 +281,10 @@ WHERE p.active = 1
                                                Pageable pageable);
 
     // sizda bor bo‘lsa ishlatamiz:
+
+    default List<Product> safeFindByIdInAndActiveTrue(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return findByIdInAndActiveTrue(ids);
+    }
 
 }

@@ -7,7 +7,15 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "event_logs")
+@Table(
+        name = "event_logs",
+        indexes = {
+                @Index(name = "idx_event_user", columnList = "user_id"),
+                @Index(name = "idx_event_product", columnList = "product_id"),
+                @Index(name = "idx_event_type", columnList = "event_type"),
+                @Index(name = "idx_event_created", columnList = "created_at")
+        }
+)
 @Getter
 @Setter
 public class EventLog {
