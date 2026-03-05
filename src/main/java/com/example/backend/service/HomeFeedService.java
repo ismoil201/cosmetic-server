@@ -159,10 +159,7 @@ public class HomeFeedService {
         blended = shuffleTopPool(blended, limit, rnd);
 
         // 8) impressions log
-        if (user != null && !blended.isEmpty()) {
-            List<Long> ids = blended.stream().map(Product::getId).filter(Objects::nonNull).toList();
-            eventTrackingService.logImpressions(user, ids);
-        }
+
 
         // 9) toCard (✅ batch: N+1 yo‘q)
         List<Product> picked = blended.stream().limit(limit).toList();
