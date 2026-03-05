@@ -62,17 +62,40 @@ public class CartService {
     }
 
     /* ================= GET MY CART ================= */
-
-    @Transactional(readOnly = true)
+    @Transactional
     public List<CartItemResponse> getMyCart() {
 
         User user = userService.getCurrentUser();
 
-        return cartRepo.findByUserId(user.getId())
-                .stream()
+        // 1) cart itemlarni olamiz
+        List<CartItem> list = cartRepo.findByUserId(user.getId());
+
+        // 2) invalid/buzilgan variantli itemlarni topamiz (variant_id=0, null yoki missing proxy)
+        List<CartItem> bad = list.stream()
+                .filter(ci -> {
+                    try {
+                        ProductVariant v = ci.getVariant();
+                        // variant null yoki id null/0 bo‘lsa invalid
+                        return (v == null || v.getId() == null || v.getId() <= 0);
+                    } catch (Exception e) {
+                        // Hibernate proxy missing (Unable to find ProductVariant...) shu yerga tushadi
+                        return true;
+                    }
+                })
+                .toList();
+
+        // 3) bularni o‘chirib tashlaymiz (shunda endpoint yiqilmaydi)
+        if (!bad.isEmpty()) {
+            cartRepo.deleteAll(bad);
+            // qaytadan toza listni olamiz
+            list = cartRepo.findByUserId(user.getId());
+        }
+
+        // 4) normal map
+        return list.stream()
                 .map(c -> {
 
-                    ProductVariant v = c.getVariant();
+                    ProductVariant v = c.getVariant(); // endi xavfsiz
                     Product p = v.getProduct();
 
                     // main image
@@ -84,8 +107,6 @@ public class CartService {
                     BigDecimal unitPrice = pricingService.unitPrice(v);
                     BigDecimal lineTotal = pricingService.lineTotal(v, c.getQuantity());
 
-                    // ProductResponse ichida "discountPrice" field sizda "finalPrice" sifatida ishlatilgan edi
-                    // endi variantga mos "unitPrice"ni finalPrice sifatida beramiz
                     ProductResponse pr = new ProductResponse(
                             p.getId(),
                             p.getName(),
