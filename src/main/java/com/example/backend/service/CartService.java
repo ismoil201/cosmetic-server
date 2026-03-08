@@ -4,10 +4,13 @@ import com.example.backend.dto.CartAddRequest;
 import com.example.backend.dto.CartItemResponse;
 import com.example.backend.dto.ProductImageResponse;
 import com.example.backend.dto.ProductResponse;
-import com.example.backend.entity.*;
+import com.example.backend.entity.CartItem;
+import com.example.backend.entity.Product;
+import com.example.backend.entity.ProductImage;
+import com.example.backend.entity.ProductVariant;
+import com.example.backend.entity.User;
 import com.example.backend.repository.CartItemRepository;
 import com.example.backend.repository.ProductImageRepository;
-import com.example.backend.repository.ProductRepository;
 import com.example.backend.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,12 +23,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CartService {
 
-
     private final CartItemRepository cartRepo;
     private final ProductVariantRepository variantRepo;
     private final ProductImageRepository productImageRepo;
     private final UserService userService;
     private final PricingService pricingService;
+
     /* ================= ADD TO CART ================= */
 
     @Transactional
@@ -33,21 +36,32 @@ public class CartService {
 
         User user = userService.getCurrentUser();
 
-        if (req.getQuantity() <= 0) throw new RuntimeException("Quantity must be greater than zero");
+        if (req.getQuantity() <= 0) {
+            throw new RuntimeException("Quantity must be greater than zero");
+        }
 
         ProductVariant v = variantRepo.findById(req.getVariantId())
                 .orElseThrow(() -> new RuntimeException("Variant not found"));
 
         Product product = v.getProduct();
 
-        if (!v.isActive() || !product.isActive()) throw new RuntimeException("Product is not active");
-        if (req.getQuantity() > v.getStock()) throw new RuntimeException("Not enough stock");
+        if (!v.isActive() || !product.isActive()) {
+            throw new RuntimeException("Product is not active");
+        }
+
+        if (req.getQuantity() > v.getStock()) {
+            throw new RuntimeException("Not enough stock");
+        }
 
         cartRepo.findByUserIdAndVariantId(user.getId(), v.getId())
                 .ifPresentOrElse(
                         item -> {
                             int newQty = item.getQuantity() + req.getQuantity();
-                            if (newQty > v.getStock()) throw new RuntimeException("Not enough stock");
+
+                            if (newQty > v.getStock()) {
+                                throw new RuntimeException("Not enough stock");
+                            }
+
                             item.setQuantity(newQty);
                             cartRepo.save(item);
                         },
@@ -62,49 +76,51 @@ public class CartService {
     }
 
     /* ================= GET MY CART ================= */
+
     @Transactional
     public List<CartItemResponse> getMyCart() {
 
         User user = userService.getCurrentUser();
 
-        // 1) cart itemlarni olamiz
+        // 1) user cart itemlari
         List<CartItem> list = cartRepo.findByUserId(user.getId());
 
-        // 2) invalid/buzilgan variantli itemlarni topamiz (variant_id=0, null yoki missing proxy)
+        // 2) invalid / buzilgan itemlarni topamiz
         List<CartItem> bad = list.stream()
                 .filter(ci -> {
                     try {
                         ProductVariant v = ci.getVariant();
-                        // variant null yoki id null/0 bo‘lsa invalid
                         return (v == null || v.getId() == null || v.getId() <= 0);
                     } catch (Exception e) {
-                        // Hibernate proxy missing (Unable to find ProductVariant...) shu yerga tushadi
                         return true;
                     }
                 })
                 .toList();
 
-        // 3) bularni o‘chirib tashlaymiz (shunda endpoint yiqilmaydi)
+        // 3) invalid itemlarni o‘chiramiz
         if (!bad.isEmpty()) {
             cartRepo.deleteAll(bad);
-            // qaytadan toza listni olamiz
             list = cartRepo.findByUserId(user.getId());
         }
 
-        // 4) normal map
+        // 4) response map
         return list.stream()
                 .map(c -> {
-
-                    ProductVariant v = c.getVariant(); // endi xavfsiz
+                    ProductVariant v = c.getVariant();
                     Product p = v.getProduct();
 
-                    // main image
                     String imageUrl = productImageRepo
                             .findFirstByProductIdAndMainTrue(p.getId())
                             .map(ProductImage::getImageUrl)
                             .orElse(null);
 
-                    BigDecimal unitPrice = pricingService.unitPrice(v);
+                    // ProductResponse uchun bazaviy discount price
+                    BigDecimal baseDiscountPrice = pricingService.baseUnitPrice(v);
+
+                    // Cart uchun effective unit price
+                    BigDecimal unitPrice = pricingService.unitPrice(v, c.getQuantity());
+
+                    // Cart uchun final total
                     BigDecimal lineTotal = pricingService.lineTotal(v, c.getQuantity());
 
                     ProductResponse pr = new ProductResponse(
@@ -112,14 +128,14 @@ public class CartService {
                             p.getName(),
                             p.getBrand(),
                             v.getPrice(),
-                            unitPrice, // ✅ variant final unit
+                            baseDiscountPrice,
                             p.getCategory(),
                             p.getRatingAvg(),
                             p.getReviewCount(),
                             p.getSoldCount(),
                             p.isTodayDeal(),
                             false,
-                            v.getStock(), // ✅ variant stock
+                            v.getStock(),
                             List.of(new ProductImageResponse(imageUrl, true))
                     );
 
@@ -153,12 +169,14 @@ public class CartService {
         }
 
         ProductVariant v = item.getVariant();
-        if (quantity > v.getStock()) throw new RuntimeException("Not enough stock");
+
+        if (quantity > v.getStock()) {
+            throw new RuntimeException("Not enough stock");
+        }
 
         item.setQuantity(quantity);
         cartRepo.save(item);
     }
-
 
     /* ================= DELETE CART ITEM ================= */
 
@@ -174,7 +192,7 @@ public class CartService {
         cartRepo.delete(item);
     }
 
-    /* ================= CLEAR CART (ORDER SUCCESS) ================= */
+    /* ================= CLEAR CART ================= */
 
     @Transactional
     public void clearMyCart() {

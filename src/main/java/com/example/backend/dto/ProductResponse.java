@@ -14,10 +14,12 @@ public class ProductResponse {
     private Long id;
     private String name;
     private String brand;
-    // 💰 BIGDECIMAL (ENG MUHIM FIX)
-    private BigDecimal price;
-    private BigDecimal discountPrice;
 
+    // original narx
+    private BigDecimal price;
+
+    // bazaviy discount narx (quantity ga bog‘liq emas)
+    private BigDecimal discountPrice;
 
     private Category category;
     private BigDecimal ratingAvg;
@@ -27,7 +29,8 @@ public class ProductResponse {
     private boolean isTodayDeal;
     private boolean favorite;
 
-    private int stock;              // 🔥 QO‘SHILDI
+    // variant stock
+    private int stock;
 
     private List<ProductImageResponse> images;
 }

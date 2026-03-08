@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 @Data
 @AllArgsConstructor
 public class CartItemResponse {
+
     private Long id;
 
     private ProductResponse product;
@@ -15,8 +16,11 @@ public class CartItemResponse {
     private Long variantId;
     private String variantLabel;
 
-    private BigDecimal unitPrice;  // fallback uchun
-    private BigDecimal lineTotal;  // tier bo‘lsa total shu bo‘ladi
+    // savatdagi hozirgi quantity uchun effective bitta dona narx
+    private BigDecimal unitPrice;
+
+    // savatdagi hozirgi quantity uchun final total narx
+    private BigDecimal lineTotal;
 
     private int quantity;
 }
