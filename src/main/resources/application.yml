@@ -30,3 +30,11 @@ springdoc:
     tagsSorter: alpha
     docExpansion: none
     disable-swagger-default-url: true
+
+cloudflare:
+  r2:
+    account-id: 83f8826bb94a921e485012606e7eb84e
+    bucket: zaven-images
+    public-base-url: https://pub-60b7f2cc97d94a78b02b7275ce1ca7a6.r2.dev
+    access-key-id: a99d07e68b0e4d3f41db80425a6cbcaf
+    secret-access-key: 364da930250c760554ee8bd672ae2684399ce2a9651d4c3ff949a647f9423c65
