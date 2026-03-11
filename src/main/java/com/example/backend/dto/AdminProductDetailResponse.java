@@ -26,4 +26,8 @@ public class AdminProductDetailResponse {
 
     private List<String> imageUrls;
     private List<ProductDetailImageResponse> detailImages;
+
+    private List<ProductVariantResponse> variants;
+
+    private SellerShortResponse seller;
 }

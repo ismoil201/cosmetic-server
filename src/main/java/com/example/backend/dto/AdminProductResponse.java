@@ -21,5 +21,7 @@ public class AdminProductResponse {
     private int soldCount;
     // 🔥
     private String mainImageUrl;
+    private Long sellerId;
+    private String sellerName;
 
 }

@@ -77,7 +77,9 @@ public class AdminProductService {
                 productImageRepository
                         .findFirstByProductIdAndMainTrue(p.getId())
                         .map(ProductImage::getImageUrl)
-                        .orElse(null)
+                        .orElse(null),
+                p.getSeller() != null ? p.getSeller().getId() : null,
+                p.getSeller() != null ? p.getSeller().getName() : null
         ));
     }
 
@@ -100,6 +102,36 @@ public class AdminProductService {
                 ))
                 .toList();
 
+        var variants = variantRepo.findByProductId(p.getId())
+                .stream()
+                .map(v -> new ProductVariantResponse(
+                        v.getId(),
+                        v.getLabel(),
+                        v.getPrice(),
+                        v.getDiscountPrice(),
+                        v.getStock(),
+                        tierRepo.findAllByVariantIdOrderByMinQtyAsc(v.getId())
+                                .stream()
+                                .map(t -> new VariantTierResponse(
+                                        t.getMinQty(),
+                                        t.getTotalPrice()
+                                ))
+                                .toList()
+                ))
+                .toList();
+
+        SellerShortResponse sellerDto = null;
+        if (p.getSeller() != null) {
+            Seller s = p.getSeller();
+            sellerDto = new SellerShortResponse(
+                    s.getId(),
+                    s.getName(),
+                    s.getPhone(),
+                    s.getStatus().name(),
+                    s.getOwnerUser() != null ? s.getOwnerUser().getId() : null
+            );
+        }
+
         return new AdminProductDetailResponse(
                 p.getId(),
                 p.getName(),
@@ -112,11 +144,11 @@ public class AdminProductService {
                 p.isActive(),
                 p.isTodayDeal(),
                 imageUrls,
-                detailImages
+                detailImages,
+                variants,
+                sellerDto
         );
     }
-
-
     // ================= CREATE =================
     @Transactional
     public void create(ProductCreateRequest req) {

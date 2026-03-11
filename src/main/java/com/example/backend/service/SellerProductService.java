@@ -53,6 +53,7 @@ public class SellerProductService {
         // ✅ ownership
         product.setSeller(seller);
 
+        product.setActive(false);
         productRepo.save(product);
 
         saveImages(product, req.getImageUrls());

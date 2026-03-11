@@ -12,11 +12,8 @@ public class ProductVariantResponse {
 
     private Long id;
     private String label;
-
     private BigDecimal price;
     private BigDecimal discountPrice;
-
     private int stock;
-
     private List<VariantTierResponse> tiers;
 }
