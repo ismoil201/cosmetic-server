@@ -46,6 +46,6 @@ public class Seller {
     }
 
     public enum SellerStatus {
-        PENDING, APPROVED, BLOCKED
+        PENDING, ACTIVE, BLOCKED
     }
 }
