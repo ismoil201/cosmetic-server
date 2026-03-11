@@ -47,7 +47,7 @@ public class SellerService {
         Seller seller = new Seller();
         seller.setOwnerUser(user);
         seller.setName(shopName);
-        seller.setStatus(Seller.SellerStatus.APPROVED);
+        seller.setStatus(Seller.SellerStatus.ACTIVE);
 
         seller = sellerRepository.save(seller);
 
