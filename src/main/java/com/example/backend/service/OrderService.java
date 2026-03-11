@@ -45,27 +45,36 @@ public class OrderService {
         Receiver receiver = receiverService.getOwnedByCurrentUser(req.getReceiverId());
         Address address = addressService.getOwnedByCurrentUser(req.getAddressId());
 
-        List<CartItem> cartItems = cartRepo.findByUserId(user.getId());
-        if (cartItems.isEmpty()) throw new RuntimeException("Cart is empty");
+        List<Long> selectedCartItemIds = req.getCartItemIds();
 
-        // ================= MASTER ORDER =================
+        if (selectedCartItemIds == null || selectedCartItemIds.isEmpty()) {
+            throw new RuntimeException("No cart items selected");
+        }
+
+        List<CartItem> cartItems = cartRepo.findByUserIdAndIdIn(user.getId(), selectedCartItemIds);
+
+        if (cartItems.isEmpty()) {
+            throw new RuntimeException("Selected cart items not found");
+        }
+
+        if (cartItems.size() != selectedCartItemIds.size()) {
+            throw new RuntimeException("Some selected cart items are invalid");
+        }
+
         Order order = new Order();
         order.setUser(user);
         order.setReceiverId(receiver.getId());
         order.setAddressId(address.getId());
-
         order.setAddress(address.getAddress());
         order.setLatitude(address.getLatitude());
         order.setLongitude(address.getLongitude());
         order.setPhone(receiver.getPhone());
-
         order.setStatus(OrderStatus.NEW);
         order.setTotalAmount(BigDecimal.ZERO);
 
         order = orderRepo.save(order);
         orderStatusHistoryService.log(order, OrderStatus.NEW);
 
-        // ================= GROUP BY SELLER =================
         Map<Seller, List<CartItem>> grouped =
                 cartItems.stream()
                         .collect(java.util.stream.Collectors.groupingBy(
@@ -74,7 +83,6 @@ public class OrderService {
 
         BigDecimal grandTotal = BigDecimal.ZERO;
 
-        // ================= EACH SELLER =================
         for (Map.Entry<Seller, List<CartItem>> entry : grouped.entrySet()) {
 
             Seller seller = entry.getKey();
@@ -106,39 +114,32 @@ public class OrderService {
                     throw new RuntimeException("Not enough stock: " + product.getName() + " " + v.getLabel());
                 }
 
-                // ✅ stock variantdan kamayadi
                 v.setStock(v.getStock() - c.getQuantity());
                 variantRepo.save(v);
 
-                // ✅ tier bilan line total
                 BigDecimal lineTotal = pricingService.lineTotal(v, c.getQuantity());
                 sellerSubtotal = sellerSubtotal.add(lineTotal);
 
                 OrderItem oi = new OrderItem();
                 oi.setOrder(order);
                 oi.setSellerOrder(sellerOrder);
-                oi.setProduct(product);     // snapshot product
-                oi.setVariant(v);           // ✅ qaysi variant ekanini saqlaymiz
+                oi.setProduct(product);
+                oi.setVariant(v);
                 oi.setQuantity(c.getQuantity());
-                oi.setPrice(lineTotal);     // ✅ TOTAL (tier applied)
+                oi.setPrice(lineTotal);
 
                 orderItemRepo.save(oi);
             }
+
             sellerOrder.setSubtotalAmount(sellerSubtotal);
             sellerOrderRepo.save(sellerOrder);
 
             grandTotal = grandTotal.add(sellerSubtotal);
         }
 
-        order.setTotalAmount(grandTotal);
-        orderRepo.save(order);
-
-        cartRepo.deleteByUserId(user.getId());
-
         BigDecimal FREE_SHIPPING_THRESHOLD = new BigDecimal("500000");
         BigDecimal SHIPPING_FEE = new BigDecimal("30000");
 
-// grandTotal -> productlar summasi (siz hisoblagansiz)
         BigDecimal finalTotal = grandTotal.compareTo(FREE_SHIPPING_THRESHOLD) < 0
                 ? grandTotal.add(SHIPPING_FEE)
                 : grandTotal;
@@ -146,11 +147,10 @@ public class OrderService {
         order.setTotalAmount(finalTotal);
         orderRepo.save(order);
 
-
+        cartRepo.deleteByUserIdAndIdIn(user.getId(), selectedCartItemIds);
 
         return detail(order.getId());
     }
-
     /* ================= MY ORDERS ================= */
 
     public List<OrderResponse> myOrders() {
