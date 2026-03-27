@@ -91,10 +91,10 @@ server:
 # ✅ PRODUCTION: Conditional Swagger (disabled by default)
 springdoc:
   api-docs:
-    enabled: ${SWAGGER_ENABLED:false}  # Disable in production
+    enabled: ${SWAGGER_ENABLED:true}  # Disable in production
     path: /v3/api-docs
   swagger-ui:
-    enabled: ${SWAGGER_ENABLED:false}  # Disable in production
+    enabled: ${SWAGGER_ENABLED:true}  # Disable in production
     path: /swagger-ui.html
     display-request-duration: true
     operationsSorter: method
