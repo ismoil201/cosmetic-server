@@ -490,99 +490,38 @@ public class ProductService {
                 .toList();
     }
 
-    /* ================= SEARCH ================= */
+    /* ================= SEARCH (FIXED PAGINATION) ================= */
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<ProductCardResponse> search(String q, Pageable pageable) {
 
         User user = userService.getCurrentUserOrNull();
         String normalizedQuery = SearchNormalizer.normalize(q);
 
+        // ✅ FIX: Use DB sorting directly (no in-memory re-sorting)
+        // DB already sorts by: (sold_count * 3 + view_count) DESC, created_at DESC
         Page<Product> page = productRepo.fuzzySearch(normalizedQuery, pageable);
 
-        List<Product> sortedProducts = page.getContent().stream()
-                .sorted((a, b) -> {
+        // ✅ Keep DB order (remove expensive in-memory Levenshtein sorting)
+        List<Product> products = page.getContent();
+        
+        // ✅ Batch convert to cards (no N+1)
+        List<ProductCardResponse> cards = toCardsPublic(products, user);
 
-                    String aText = nullSafe(a.getSearchText());
-                    String bText = nullSafe(b.getSearchText());
-
-                    int d1 = distance(aText, normalizedQuery);
-                    int d2 = distance(bText, normalizedQuery);
-                    if (d1 != d2) return Integer.compare(d1, d2);
-
-                    boolean aBrand = a.getBrand() != null &&
-                            (normalizedQuery.contains(a.getBrand().toLowerCase()) || aText.contains(a.getBrand().toLowerCase()));
-                    boolean bBrand = b.getBrand() != null &&
-                            (normalizedQuery.contains(b.getBrand().toLowerCase()) || bText.contains(b.getBrand().toLowerCase()));
-
-                    if (aBrand != bBrand) return aBrand ? -1 : 1;
-
-                    int scoreA = a.getSoldCount() * 3 + a.getViewCount();
-                    int scoreB = b.getSoldCount() * 3 + b.getViewCount();
-                    return Integer.compare(scoreB, scoreA);
-                })
-                .toList();
-
-        List<ProductCardResponse> cards = toCardsPublic(sortedProducts, user);
-
+        // ✅ Log search (async would be better, but sync is fine for now)
         SearchLog log = new SearchLog();
         log.setKeyword(q);
         log.setNormalizedKeyword(normalizedQuery);
-        log.setResultCount(cards.size());
+        log.setResultCount((int) page.getTotalElements());  // Use total, not page size
         log.setUser(user);
         searchLogRepo.save(log);
 
         return new PageImpl<>(cards, pageable, page.getTotalElements());
     }
 
-    private int distance(String text, String query) {
-        if (text == null) text = "";
-        if (query == null) query = "";
-        text = text.trim().toLowerCase();
-        query = query.trim().toLowerCase();
-
-        if (text.isBlank() || query.isBlank()) return Integer.MAX_VALUE;
-
-        String[] textTokens = text.split("\\s+");
-        String[] qTokens = query.split("\\s+");
-
-        int sum = 0;
-        for (String qTok : qTokens) {
-            int min = Integer.MAX_VALUE;
-            for (String tTok : textTokens) {
-                min = Math.min(min, levenshtein(tTok, qTok));
-                if (min == 0) break;
-            }
-            sum += min;
-        }
-        return sum;
-    }
-
-    private String nullSafe(String s) {
-        return s == null ? "" : s;
-    }
-
-    private int levenshtein(String a, String b) {
-        a = a.toLowerCase();
-        b = b.toLowerCase();
-
-        int[] costs = new int[b.length() + 1];
-        for (int j = 0; j < costs.length; j++) costs[j] = j;
-
-        for (int i = 1; i <= a.length(); i++) {
-            costs[0] = i;
-            int nw = i - 1;
-            for (int j = 1; j <= b.length(); j++) {
-                int cj = Math.min(
-                        1 + Math.min(costs[j], costs[j - 1]),
-                        a.charAt(i - 1) == b.charAt(j - 1) ? nw : nw + 1
-                );
-                nw = costs[j];
-                costs[j] = cj;
-            }
-        }
-        return costs[b.length()];
-    }
+    // ✅ Removed expensive Levenshtein distance calculation
+    // DB-level sorting (sold_count, view_count, created_at) is sufficient
+    // If advanced relevance scoring needed in future, use Elasticsearch
 
     private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());

@@ -4,37 +4,145 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # ✅ PRODUCTION: HikariCP connection pool configuration
+    hikari:
+      maximum-pool-size: 20  # Max connections (adjust based on load)
+      minimum-idle: 5  # Minimum idle connections
+      connection-timeout: 30000  # 30 seconds
+      idle-timeout: 600000  # 10 minutes
+      max-lifetime: 1800000  # 30 minutes
+      leak-detection-threshold: 60000  # Detect leaks after 60s
+      connection-test-query: SELECT 1  # Validate connections
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      # ✅ PRODUCTION: NEVER use 'update' in production
+      # Use 'validate' to ensure schema matches or 'none' + Flyway/Liquibase
+      ddl-auto: validate
+    # ✅ PRODUCTION: NEVER log SQL in production (performance killer)
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-# ... existing code ...
+        # ✅ PRODUCTION: Enable batch inserts for performance
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        # ✅ PRODUCTION: Query statistics (disable in prod if not needed)
+        generate_statistics: false
 
+  # ✅ Redis Configuration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 20  # Increased for production
+          max-idle: 10
+          min-idle: 5
+          max-wait: 3000ms
+      connect-timeout: 2000ms
+
+  # ✅ Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000  # Default 5 minutes
+      cache-null-values: false
+      use-key-prefix: true
+
+  # ✅ PRODUCTION: Transaction timeout (prevent hanging transactions)
+  transaction:
+    default-timeout: 30  # 30 seconds max
+
+# ✅ PRODUCTION: CORS configuration (MUST UPDATE WITH REAL DOMAINS)
 app:
   cors:
-    # dev uchun: frontend portlaringiz
-    allowed-origins: "http://localhost:3000,http://localhost:5173"
+    # WARNING: Update these with your actual production domains
+    # NEVER use wildcard (*) or localhost in production
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  # ✅ PRODUCTION: JWT secret from environment
+  jwt:
+    secret: ${JWT_SECRET}  # REQUIRED: Set via environment variable
+
+# ✅ Server configuration
 server:
   port: ${PORT:8080}
+  # ✅ PRODUCTION: Graceful shutdown
+  shutdown: graceful
+  # ✅ PRODUCTION: Compression
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+  # ✅ PRODUCTION: Request limits
+  max-http-header-size: 16KB
+  tomcat:
+    max-connections: 10000
+    threads:
+      max: 200
+      min-spare: 10
+    connection-timeout: 20s
+    max-swallow-size: 2MB
+
+# ✅ PRODUCTION: Conditional Swagger (disabled by default)
 springdoc:
   api-docs:
+    enabled: ${SWAGGER_ENABLED:false}  # Disable in production
     path: /v3/api-docs
   swagger-ui:
-    path: /swagger-ui.html   # foydalanuvchi shu bilan kiradi, u /swagger-ui/index.html ga redirect bo‘ladi
+    enabled: ${SWAGGER_ENABLED:false}  # Disable in production
+    path: /swagger-ui.html
     display-request-duration: true
     operationsSorter: method
     tagsSorter: alpha
     docExpansion: none
     disable-swagger-default-url: true
 
+# ✅ PRODUCTION: Cloudflare R2 from environment variables
 cloudflare:
   r2:
-    account-id: 83f8826bb94a921e485012606e7eb84e
-    bucket: zaven-images
-    public-base-url: https://pub-60b7f2cc97d94a78b02b7275ce1ca7a6.r2.dev
-    access-key-id: a99d07e68b0e4d3f41db80425a6cbcaf
-    secret-access-key: 364da930250c760554ee8bd672ae2684399ce2a9651d4c3ff949a647f9423c65
+    account-id: ${R2_ACCOUNT_ID}  # REQUIRED: Set via environment
+    bucket: ${R2_BUCKET_NAME}  # REQUIRED: Set via environment
+    public-base-url: ${R2_PUBLIC_URL}  # REQUIRED: Set via environment
+    access-key-id: ${R2_ACCESS_KEY}  # REQUIRED: Set via environment
+    secret-access-key: ${R2_SECRET_KEY}  # REQUIRED: Set via environment
+
+# ✅ PRODUCTION: Logging configuration
+logging:
+  level:
+    root: INFO
+    com.example.backend: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+  # ✅ PRODUCTION: Use JSON logging for monitoring (optional)
+  # pattern:
+  #   console: '{"timestamp":"%d{ISO8601}","level":"%level","logger":"%logger","message":"%message","thread":"%thread"}%n'
+
+# ✅ PRODUCTION: Actuator endpoints for monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized  # Hide details from public
+      probes:
+        enabled: true  # Enable liveness/readiness probes
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true

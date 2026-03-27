@@ -29,6 +29,9 @@ public class HomeFeedService {
     private final EventLogRepository eventRepo;
     private final NegativeFeedbackService negativeFeedbackService;
 
+    // ✅ NEW: Use cached user interests service
+    private final UserInterestCacheService userInterestCacheService;
+
     @Transactional(readOnly = true)
     public List<ProductCardResponse> buildFeed(int limit) {
 
@@ -62,26 +65,22 @@ public class HomeFeedService {
         List<Long> excludeSoft = new ArrayList<>(seenSet);
         boolean excludeSoftEmpty = excludeSoft.isEmpty();
 
-        // 2) interest map
-        Map<String, Double> catScore = new HashMap<>();
-        Map<String, Double> brandScore = new HashMap<>();
-        if (user != null) {
-            interestRepo.findTop20ByUserAndTypeOrderByScoreDesc(user, InterestType.CATEGORY)
-                    .forEach(x -> { if (x.getKey() != null) catScore.put(x.getKey(), x.getScore()); });
+        // 2) ✅ CACHED: interest map (30min TTL)
+        Map<String, Double> catScore = (user != null)
+            ? userInterestCacheService.getCategoryScores(user)
+            : new HashMap<>();
 
-            interestRepo.findTop20ByUserAndTypeOrderByScoreDesc(user, InterestType.BRAND)
-                    .forEach(x -> {
-                        if (x.getKey() != null) brandScore.put(x.getKey().trim().toLowerCase(), x.getScore());
-                    });
-        }
+        Map<String, Double> brandScore = (user != null)
+            ? userInterestCacheService.getBrandScores(user)
+            : new HashMap<>();
 
         // 3) candidates: PERSONAL (interest) + EXPLORE (global)
         List<Product> personalCandidates = new ArrayList<>();
         List<Product> exploreCandidates = new ArrayList<>();
 
         if (user != null) {
-            // top categories
-            List<String> catKeys = interestRepo.topKeys(user, InterestType.CATEGORY, PageRequest.of(0, 4));
+            // ✅ CACHED: top categories (30min TTL)
+            List<String> catKeys = userInterestCacheService.getTopCategoryKeys(user);
             List<Category> cats = new ArrayList<>();
             for (String k : catKeys) {
                 if (k == null) continue;
@@ -94,11 +93,9 @@ public class HomeFeedService {
                 ));
             }
 
-            // top brands
-            List<String> brands = interestRepo.topKeys(user, InterestType.BRAND, PageRequest.of(0, 4))
+            // ✅ CACHED: top brands (30min TTL)
+            List<String> brands = userInterestCacheService.getTopBrandKeys(user)
                     .stream()
-                    .filter(Objects::nonNull)
-                    .map(s -> s.trim().toLowerCase())
                     .filter(s -> !s.isBlank())
                     .toList();
 

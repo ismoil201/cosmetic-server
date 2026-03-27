@@ -151,14 +151,80 @@ public class OrderService {
 
         return detail(order.getId());
     }
-    /* ================= MY ORDERS ================= */
+    /* ================= MY ORDERS (BATCH OPTIMIZED) ================= */
 
+    @Transactional(readOnly = true)
     public List<OrderResponse> myOrders() {
         User user = userService.getCurrentUser();
-
-        return orderRepo.findByUserId(user.getId())
-                .stream()
-                .map(o -> detail(o.getId()))
+        List<Order> orders = orderRepo.findByUserId(user.getId());
+        
+        if (orders.isEmpty()) return List.of();
+        
+        // ✅ Batch fetch all order items in 1 query
+        List<Long> orderIds = orders.stream()
+                .map(Order::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        
+        List<OrderItem> allItems = orderItemRepo.findByOrderIdIn(orderIds);
+        
+        // ✅ Batch fetch all product images in 1 query
+        List<Long> productIds = allItems.stream()
+                .map(item -> item.getProduct().getId())
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        
+        Map<Long, String> imageMap = new java.util.HashMap<>();
+        if (!productIds.isEmpty()) {
+            List<ProductImage> images = productImageRepo.findByProductIdInOrderByMainDescIdAsc(productIds);
+            for (ProductImage img : images) {
+                Long pid = img.getProduct() != null ? img.getProduct().getId() : null;
+                if (pid != null && !imageMap.containsKey(pid)) {
+                    imageMap.put(pid, img.getImageUrl());
+                }
+            }
+        }
+        
+        // ✅ Group items by order
+        Map<Long, List<OrderItem>> itemsByOrder = allItems.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        item -> item.getOrder().getId()
+                ));
+        
+        // ✅ Build responses without additional queries
+        return orders.stream()
+                .map(order -> {
+                    List<OrderItem> items = itemsByOrder.getOrDefault(order.getId(), List.of());
+                    
+                    List<OrderItemResponse> itemResponses = items.stream()
+                            .map(i -> {
+                                ProductVariant v = i.getVariant();
+                                return new OrderItemResponse(
+                                        i.getProduct().getId(),
+                                        i.getProduct().getName(),
+                                        v != null ? v.getId() : null,
+                                        v != null ? v.getLabel() : null,
+                                        imageMap.get(i.getProduct().getId()),
+                                        i.getPrice(),
+                                        i.getQuantity()
+                                );
+                            })
+                            .toList();
+                    
+                    return new OrderResponse(
+                            order.getId(),
+                            order.getStatus(),
+                            order.getTotalAmount(),
+                            order.getCreatedAt(),
+                            order.getAddress(),
+                            order.getLatitude(),
+                            order.getLongitude(),
+                            user.getFullName(),
+                            order.getPhone(),
+                            itemResponses
+                    );
+                })
                 .toList();
     }
 
@@ -212,12 +278,78 @@ public class OrderService {
                 items
         );
     }
-    /* ================= ADMIN: ALL ORDERS ================= */
+    /* ================= ADMIN: ALL ORDERS (BATCH OPTIMIZED) ================= */
 
+    @Transactional(readOnly = true)
     public List<OrderResponse> allOrders() {
-        return orderRepo.findAll()
-                .stream()
-                .map(o -> detail(o.getId()))
+        List<Order> orders = orderRepo.findAll();
+        if (orders.isEmpty()) return List.of();
+        
+        // ✅ Batch fetch all order items
+        List<Long> orderIds = orders.stream()
+                .map(Order::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        
+        List<OrderItem> allItems = orderItemRepo.findByOrderIdIn(orderIds);
+        
+        // ✅ Batch fetch all product images
+        List<Long> productIds = allItems.stream()
+                .map(item -> item.getProduct().getId())
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        
+        Map<Long, String> imageMap = new java.util.HashMap<>();
+        if (!productIds.isEmpty()) {
+            List<ProductImage> images = productImageRepo.findByProductIdInOrderByMainDescIdAsc(productIds);
+            for (ProductImage img : images) {
+                Long pid = img.getProduct() != null ? img.getProduct().getId() : null;
+                if (pid != null && !imageMap.containsKey(pid)) {
+                    imageMap.put(pid, img.getImageUrl());
+                }
+            }
+        }
+        
+        // ✅ Group items by order
+        Map<Long, List<OrderItem>> itemsByOrder = allItems.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        item -> item.getOrder().getId()
+                ));
+        
+        // ✅ Build responses
+        return orders.stream()
+                .map(order -> {
+                    List<OrderItem> items = itemsByOrder.getOrDefault(order.getId(), List.of());
+                    
+                    List<OrderItemResponse> itemResponses = items.stream()
+                            .map(i -> {
+                                ProductVariant v = i.getVariant();
+                                return new OrderItemResponse(
+                                        i.getProduct().getId(),
+                                        i.getProduct().getName(),
+                                        v != null ? v.getId() : null,
+                                        v != null ? v.getLabel() : null,
+                                        imageMap.get(i.getProduct().getId()),
+                                        i.getPrice(),
+                                        i.getQuantity()
+                                );
+                            })
+                            .toList();
+                    
+                    return new OrderResponse(
+                            order.getId(),
+                            order.getStatus(),
+                            order.getTotalAmount(),
+                            order.getCreatedAt(),
+                            order.getAddress(),
+                            order.getLatitude(),
+                            order.getLongitude(),
+                            order.getUser().getFullName(),
+                            order.getPhone(),
+                            itemResponses
+                    );
+                })
                 .toList();
     }
 

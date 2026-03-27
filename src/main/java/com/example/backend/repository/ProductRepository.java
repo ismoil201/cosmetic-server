@@ -4,9 +4,8 @@ import com.example.backend.entity.Category;
 import com.example.backend.entity.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,6 +17,9 @@ import java.util.Optional;
 
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
+
+    @EntityGraph(attributePaths = {"seller", "seller.ownerUser"})
+    Optional<Product> findWithSellerById(Long id);
 
     // ✅ ADMIN
     Page<Product> findByActive(boolean active, Pageable pageable);
@@ -171,24 +173,23 @@ where p.active = true
             Pageable pageable
     );
 
+    // ✅ OPTIMIZED: Removed SOUNDEX (slow), simplified to single LIKE
+    // ✅ Composite index (active, sold_count, view_count) will help
+    // ✅ Added id DESC tie-breaker for stable sorting
+    // ✅ For better performance at scale, migrate to FULLTEXT or Elasticsearch
     @Query(value = """
 SELECT * FROM products p
 WHERE p.active = 1
-  AND (
-       p.search_text LIKE CONCAT('%', :q, '%')
-    OR SOUNDEX(p.search_text) = SOUNDEX(:q)
-  )
+  AND p.search_text LIKE CONCAT('%', :q, '%')
 ORDER BY
   (p.sold_count * 3 + p.view_count) DESC,
-  p.created_at DESC
+  p.created_at DESC,
+  p.id DESC
 """,
             countQuery = """
 SELECT COUNT(*) FROM products p
 WHERE p.active = 1
-  AND (
-       p.search_text LIKE CONCAT('%', :q, '%')
-    OR SOUNDEX(p.search_text) = SOUNDEX(:q)
-  )
+  AND p.search_text LIKE CONCAT('%', :q, '%')
 """,
             nativeQuery = true)
     Page<Product> fuzzySearch(

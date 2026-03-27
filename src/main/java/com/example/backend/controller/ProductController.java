@@ -99,9 +99,23 @@ public class ProductController {
 
     @GetMapping("/search")
     public Page<ProductCardResponse> search(
-            @RequestParam String q,
+            @RequestParam(required = false, defaultValue = "") String q,
             Pageable pageable
     ) {
+        // ✅ Safety: trim and validate
+        if (q == null) q = "";
+        q = q.trim();
+        
+        // ✅ Empty query: return empty results (don't scan all products)
+        if (q.isEmpty() || q.isBlank()) {
+            return org.springframework.data.domain.Page.empty(pageable);
+        }
+        
+        // ✅ Length limit: prevent DoS
+        if (q.length() > 100) {
+            q = q.substring(0, 100);
+        }
+        
         return productService.search(q, pageable);
     }
 

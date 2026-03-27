@@ -13,7 +13,11 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_products_brand", columnList = "brand"),
                 @Index(name = "idx_products_sold_count", columnList = "sold_count"),
                 @Index(name = "idx_products_created_at", columnList = "created_at"),
-                @Index(name = "idx_products_active", columnList = "active")
+                @Index(name = "idx_products_active", columnList = "active"),
+                // ✅ CRITICAL: Search text index (helps LIKE queries)
+                @Index(name = "idx_products_search_text", columnList = "search_text"),
+                // ✅ CRITICAL: Composite index for search query optimization
+                @Index(name = "idx_products_active_sold_view", columnList = "active,sold_count,view_count")
         }
 )
 @Getter

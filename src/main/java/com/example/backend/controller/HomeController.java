@@ -30,8 +30,12 @@ public class HomeController {
             @RequestParam(required = false) String seed,
             Pageable pageable
     ) {
+        // ✅ Limit validation: prevent DoS
+        if (limit < 1) limit = 10;
+        if (limit > 50) limit = 50;  // Max 50 per block
+
         if (seed == null || seed.isBlank()) {
-            // seed bo‘lmasa ham ishlasin
+            // seed bo'lmasa ham ishlasin
             seed = String.valueOf(System.currentTimeMillis());
         }
         return homeService.home(limit, pageable, seed);
@@ -39,6 +43,10 @@ public class HomeController {
 
     @GetMapping("/feed")
     public List<ProductCardResponse> feed(@RequestParam(defaultValue="30") int limit) {
+        // ✅ Limit validation: prevent DoS
+        if (limit < 1) limit = 30;
+        if (limit > 100) limit = 100;  // Max 100 for infinite scroll
+
         return feedService.buildFeed(limit);
     }
 }

@@ -85,15 +85,15 @@ public class AdminProductService {
 
     public AdminProductDetailResponse detail(Long id) {
 
-        Product p = productRepo.findById(id)
+        Product p = productRepo.findWithSellerById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-        var imageUrls = productImageRepo.findByProductId(p.getId())
+        List<String> imageUrls = productImageRepo.findByProductId(p.getId())
                 .stream()
                 .map(ProductImage::getImageUrl)
                 .toList();
 
-        var detailImages = detailImageRepo
+        List<ProductDetailImageResponse> detailImages = detailImageRepo
                 .findByProductIdOrderBySortOrderAsc(p.getId())
                 .stream()
                 .map(d -> new ProductDetailImageResponse(
@@ -102,15 +102,21 @@ public class AdminProductService {
                 ))
                 .toList();
 
-        var variants = variantRepo.findByProductId(p.getId())
+        List<ProductVariant> variantsList = variantRepo.findByProductId(p.getId());
+        List<Long> variantIds = variantsList.stream().map(ProductVariant::getId).toList();
+
+        var tiersMap = tierRepo.findAllByVariantIdInOrderByVariantIdAscMinQtyAsc(variantIds)
                 .stream()
+                .collect(java.util.stream.Collectors.groupingBy(t -> t.getVariant().getId()));
+
+        List<ProductVariantResponse> variants = variantsList.stream()
                 .map(v -> new ProductVariantResponse(
                         v.getId(),
                         v.getLabel(),
                         v.getPrice(),
                         v.getDiscountPrice(),
                         v.getStock(),
-                        tierRepo.findAllByVariantIdOrderByMinQtyAsc(v.getId())
+                        tiersMap.getOrDefault(v.getId(), List.of())
                                 .stream()
                                 .map(t -> new VariantTierResponse(
                                         t.getMinQty(),

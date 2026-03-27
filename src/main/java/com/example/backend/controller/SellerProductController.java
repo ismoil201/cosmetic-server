@@ -33,8 +33,7 @@ public class SellerProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return sellerProductService.myProducts(PageRequest.of(page, size))
-                .map(sellerProductService::toListResponse);
+        return sellerProductService.myProducts(PageRequest.of(page, size));
     }
     // =============== DETAIL ===============
     @GetMapping("/{id}")

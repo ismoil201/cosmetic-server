@@ -25,11 +25,61 @@ public class SellerProductService {
     private final VariantTierPriceRepository tierRepo;
     private final SellerService sellerService;
 
-    // ================= LIST (MY PRODUCTS) =================
+    // ================= LIST (MY PRODUCTS - BATCH OPTIMIZED) =================
     @Transactional(readOnly = true)
-    public Page<Product> myProducts(Pageable pageable) {
+    public org.springframework.data.domain.Page<SellerProductListResponse> myProducts(Pageable pageable) {
         Long sellerId = sellerService.requireCurrentSellerId();
-        return productRepo.findBySellerIdAndActiveTrueOrderByCreatedAtDesc(sellerId, pageable);
+        Page<Product> productPage = productRepo.findBySellerIdAndActiveTrueOrderByCreatedAtDesc(sellerId, pageable);
+        
+        List<Product> products = productPage.getContent();
+        if (products.isEmpty()) {
+            return new org.springframework.data.domain.PageImpl<>(
+                    List.of(), 
+                    productPage.getPageable(), 
+                    productPage.getTotalElements()
+            );
+        }
+        
+        // ✅ Batch fetch main images in 1 query
+        List<Long> productIds = products.stream()
+                .map(Product::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        
+        List<ProductImage> allImages = productImageRepo.findByProductIdInOrderByMainDescIdAsc(productIds);
+        java.util.Map<Long, String> mainImageMap = new java.util.HashMap<>();
+        
+        for (ProductImage img : allImages) {
+            Long pid = img.getProduct() != null ? img.getProduct().getId() : null;
+            if (pid != null && !mainImageMap.containsKey(pid)) {
+                mainImageMap.put(pid, img.getImageUrl());
+            }
+        }
+        
+        // ✅ Build responses without additional queries
+        List<SellerProductListResponse> responses = products.stream()
+                .map(p -> new SellerProductListResponse(
+                        p.getId(),
+                        p.getName(),
+                        p.getBrand(),
+                        p.getPrice(),
+                        p.getDiscountPrice(),
+                        p.getCategory(),
+                        p.getStock(),
+                        p.getSoldCount(),
+                        p.getRatingAvg(),
+                        p.getReviewCount(),
+                        p.isActive(),
+                        mainImageMap.get(p.getId()),
+                        p.getCreatedAt()
+                ))
+                .toList();
+        
+        return new org.springframework.data.domain.PageImpl<>(
+                responses,
+                productPage.getPageable(),
+                productPage.getTotalElements()
+        );
     }
 
     // ================= DETAIL (MY PRODUCT) =================

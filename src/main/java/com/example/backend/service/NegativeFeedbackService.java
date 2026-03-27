@@ -47,23 +47,34 @@ public class NegativeFeedbackService {
                 after
         ));
 
+        // ✅ FIX: Collect negative product IDs first
+        List<Long> negativeProductIds = new ArrayList<>();
         for (var e : impr.entrySet()) {
             Long productId = e.getKey();
             long imprCount = e.getValue();
             long clickCount = clk.getOrDefault(productId, 0L);
 
-            // 3+ marta ko‘rdi, lekin umuman bosmadi => qiziqmas ekan
+            // 3+ marta ko'rdi, lekin umuman bosmadi => qiziqmas ekan
             if (imprCount >= 3 && clickCount == 0) {
-                Product p = productRepo.findById(productId).orElse(null);
-                if (p == null) continue;
+                negativeProductIds.add(productId);
+            }
+        }
 
-                // kichik penalty: "bu yoqmayapti"
-                if (p.getCategory() != null) {
-                    interestService.bump(user, InterestType.CATEGORY, p.getCategory().name(), -0.3);
-                }
-                if (p.getBrand() != null && !p.getBrand().isBlank()) {
-                    interestService.bump(user, InterestType.BRAND, p.getBrand().trim().toLowerCase(), -0.2);
-                }
+        // ✅ FIX: Batch load products (1 query instead of N)
+        if (negativeProductIds.isEmpty()) return;
+
+        List<Product> products = productRepo.findAllById(negativeProductIds);
+
+        // ✅ Apply penalties
+        for (Product p : products) {
+            if (p == null) continue;
+
+            // kichik penalty: "bu yoqmayapti"
+            if (p.getCategory() != null) {
+                interestService.bump(user, InterestType.CATEGORY, p.getCategory().name(), -0.3);
+            }
+            if (p.getBrand() != null && !p.getBrand().isBlank()) {
+                interestService.bump(user, InterestType.BRAND, p.getBrand().trim().toLowerCase(), -0.2);
             }
         }
     }
