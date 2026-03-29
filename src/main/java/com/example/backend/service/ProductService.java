@@ -490,39 +490,77 @@ public class ProductService {
                 .toList();
     }
 
-    /* ================= SEARCH (FIXED PAGINATION) ================= */
+    /* ================= PROFESSIONAL MARKETPLACE SEARCH ================= */
 
+    /**
+     * ✅ PROFESSIONAL MARKETPLACE SEARCH
+     *
+     * Features:
+     * - Multi-field search (name, description, search_text)
+     * - Intelligent tier-based relevance ranking
+     * - Stock-aware prioritization (in-stock first)
+     * - Capped popularity boost (prevents dominance)
+     * - Multi-language support (UZ/RU/EN via SearchNormalizer)
+     * - Efficient pagination
+     * - Search analytics logging
+     *
+     * Ranking Hierarchy:
+     * 1. Exact name match (score ~2000)
+     * 2. Name prefix match (score ~1000)
+     * 3. Partial name match (score ~400)
+     * 4. Description match (score ~100)
+     * 5. search_text match (score ~50)
+     *
+     * @param q Raw user query (may contain typos, synonyms, UZ/RU/EN)
+     * @param pageable Pagination parameters
+     * @return Paginated search results sorted by relevance
+     */
     @Transactional(readOnly = true)
     public Page<ProductCardResponse> search(String q, Pageable pageable) {
 
         User user = userService.getCurrentUserOrNull();
+
+        // Normalize query for multi-language support
+        // Handles: "kallagen" → "collagen", "атир" → "parfum", etc.
         String normalizedQuery = SearchNormalizer.normalize(q);
 
-        // ✅ FIX: Use DB sorting directly (no in-memory re-sorting)
-        // DB already sorts by: (sold_count * 3 + view_count) DESC, created_at DESC
-        Page<Product> page = productRepo.fuzzySearch(normalizedQuery, pageable);
+        // Use professional marketplace search (replaces old fuzzySearch)
+        Page<Product> page = productRepo.marketplaceSearch(normalizedQuery, pageable);
 
-        // ✅ Keep DB order (remove expensive in-memory Levenshtein sorting)
         List<Product> products = page.getContent();
-        
-        // ✅ Batch convert to cards (no N+1)
+
+        // Batch convert to cards (no N+1 queries)
         List<ProductCardResponse> cards = toCardsPublic(products, user);
 
-        // ✅ Log search (async would be better, but sync is fine for now)
-        SearchLog log = new SearchLog();
-        log.setKeyword(q);
-        log.setNormalizedKeyword(normalizedQuery);
-        log.setResultCount((int) page.getTotalElements());  // Use total, not page size
-        log.setUser(user);
-        searchLogRepo.save(log);
+        // Log search analytics for business intelligence
+        logSearchAnalytics(q, normalizedQuery, page.getTotalElements(), user);
 
         return new PageImpl<>(cards, pageable, page.getTotalElements());
     }
 
-    // ✅ Removed expensive Levenshtein distance calculation
-    // DB-level sorting (sold_count, view_count, created_at) is sufficient
-    // If advanced relevance scoring needed in future, use Elasticsearch
+    /**
+     * Log search analytics asynchronously
+     * TODO: Move to @Async method in production for better performance
+     */
+    private void logSearchAnalytics(String originalQuery, String normalizedQuery, long resultCount, User user) {
+        try {
+            SearchLog log = new SearchLog();
+            log.setKeyword(originalQuery);
+            log.setNormalizedKeyword(normalizedQuery);
+            log.setResultCount((int) resultCount);
+            log.setUser(user);
+            searchLogRepo.save(log);
+        } catch (Exception e) {
+            // Don't fail search if logging fails
+            // In production: use proper async logging with error monitoring
+            System.err.println("Search analytics logging failed: " + e.getMessage());
+        }
+    }
 
+    /**
+     * Map request data to Product entity
+     * Includes professional search_text generation for multi-language search
+     */
     private void map(ProductCreateRequest req, Product p) {
         p.setName(req.getName());
         p.setBrand(req.getBrand());
@@ -534,8 +572,24 @@ public class ProductService {
         Category cat = Category.valueOf(req.getCategory().toUpperCase());
         p.setCategory(cat);
 
-        String base = req.getName() + " " + req.getBrand() + " " + cat.name();
-        String normalized = SearchNormalizer.normalize(base);
-        p.setSearchText((base + " " + normalized).toLowerCase());
+        // ✅ IMPROVED: Professional search_text generation
+        // Uses SearchNormalizer.buildSearchText() for comprehensive coverage
+        // Combines: name + brand + category + description
+        // Result: raw text + normalized text (synonyms, transliterations)
+        String searchText = SearchNormalizer.buildSearchText(
+            req.getName(),           // e.g., "Collagen Serum"
+            req.getBrand(),          // e.g., "AXIS-Y"
+            cat.name(),              // e.g., "SERUM"
+            req.getDescription(),    // e.g., "Anti-aging serum with marine collagen"
+            null                     // Variant labels (can add if available)
+        );
+
+        p.setSearchText(searchText);
+
+        // Example result:
+        // "Collagen Serum AXIS-Y SERUM Anti-aging serum with marine collagen
+        //  collagen serum axis y serum anti aging serum with marine collagen"
+        // ↑ Original text preserves exact matches
+        // ↑ Normalized text handles synonyms: "kallagen" → "collagen"
     }
 }
