@@ -524,8 +524,8 @@ public class ProductService {
         // Handles: "kallagen" → "collagen", "атир" → "parfum", etc.
         String normalizedQuery = SearchNormalizer.normalize(q);
 
-        // Use professional marketplace search (replaces old fuzzySearch)
-        Page<Product> page = productRepo.marketplaceSearch(normalizedQuery, pageable);
+        // Use simple safe search (emergency fix - replaces risky marketplaceSearch)
+        Page<Product> page = productRepo.simpleSearch(normalizedQuery, pageable);
 
         List<Product> products = page.getContent();
 

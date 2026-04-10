@@ -326,4 +326,42 @@ SELECT COUNT(*) FROM products p WHERE p.active = 1 AND (LOWER(p.name) LIKE LOWER
         return findByIdInAndActiveTrue(ids);
     }
 
+    /**
+     * ✅ SIMPLE SAFE SEARCH (Emergency production fix)
+     *
+     * Search ONLY in:
+     * - Product name (exact match prioritized)
+     * - Product search_text (partial match)
+     *
+     * Active products only.
+     * Simple stable ordering: exact match first, then by sold_count.
+     *
+     * NO complex relevance calculation.
+     * NO native query risks.
+     * NO sort injection issues.
+     *
+     * @param q Normalized search query (from SearchNormalizer)
+     * @param pageable Pagination (must be unsorted from controller)
+     * @return Paginated search results with stable ordering
+     */
+    @Query("""
+        select p from Product p
+        where p.active = true
+          and (
+               lower(p.name) like lower(concat('%', :q, '%'))
+            or lower(p.searchText) like lower(concat('%', :q, '%'))
+          )
+        order by
+          case when lower(p.name) = lower(:q) then 0
+               when lower(p.name) like lower(concat(:q, '%')) then 1
+               else 2
+          end,
+          p.soldCount desc,
+          p.id desc
+    """)
+    Page<Product> simpleSearch(
+            @Param("q") String q,
+            Pageable pageable
+    );
+
 }
