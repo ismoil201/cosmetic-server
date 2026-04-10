@@ -75,19 +75,20 @@ public class HomeService {
     // ==================== CACHED BLOCK METHODS ====================
 
     /**
-     * ✅ CACHED: Hits (Today Deals) Block
+     * ⚠️ CACHE REMOVED: Hits (Today Deals) Block
      *
-     * Cache: home:blocks:hits:{limit}:{seed}:{excludeIds}
-     * TTL: 5 minutes
-     * Why: Same data for all users, expensive shuffle query
+     * WHY NO CACHE:
+     * - Caching JPA entities with @Cacheable causes Redis type metadata leakage
+     * - When cached entity is returned to REST, Android receives Jackson typed JSON
+     * - Error: "Could not resolve type id 'cosrx'" (brand field interpreted as type)
      *
-     * Note: Exclusion list is part of cache key to preserve correctness
+     * SOLUTION:
+     * - Query database directly (Product entities are simple, query is fast)
+     * - Spring's @Primary ObjectMapper ensures clean JSON serialization
+     * - No Redis contamination in HTTP responses
+     *
+     * Performance: Acceptable for home page (5-10ms query vs 1ms cache hit)
      */
-    @Cacheable(
-        value = "home:blocks",
-        key = "'hits:' + #limit + ':' + #seed + ':' + (#excludeIds.isEmpty() ? 'none' : #excludeIds.hashCode())",
-        unless = "#result == null || #result.isEmpty()"
-    )
     public List<Product> getHitsBlock(int limit, String seed, List<Long> excludeIds) {
         return productRepo.hitsShuffledExclude(
             seed,
@@ -98,17 +99,18 @@ public class HomeService {
     }
 
     /**
-     * ✅ CACHED: Discounts Block
+     * ⚠️ CACHE REMOVED: Discounts Block
      *
-     * Cache: home:blocks:discounts:{limit}:{seed}:{excludeIds}
-     * TTL: 5 minutes
-     * Why: Same data for all users, expensive shuffle + filter query
+     * WHY NO CACHE:
+     * - Caching JPA entities with @Cacheable causes Redis type metadata leakage
+     * - Android client receives typed JSON with @class fields
+     * - Error: "Expected a string but was BEGIN_ARRAY at path $[0].createdAt"
+     *
+     * SOLUTION:
+     * - Query database directly
+     * - Spring's @Primary ObjectMapper serializes LocalDateTime as ISO-8601 string
+     * - No Redis contamination
      */
-    @Cacheable(
-        value = "home:blocks",
-        key = "'discounts:' + #limit + ':' + #seed + ':' + (#excludeIds.isEmpty() ? 'none' : #excludeIds.hashCode())",
-        unless = "#result == null || #result.isEmpty()"
-    )
     public List<Product> getDiscountsBlock(int limit, String seed, List<Long> excludeIds) {
         return productRepo.discountsShuffledExclude(
             seed,
@@ -119,17 +121,16 @@ public class HomeService {
     }
 
     /**
-     * ✅ CACHED: New Arrivals Block
+     * ⚠️ CACHE REMOVED: New Arrivals Block
      *
-     * Cache: home:blocks:new:{limit}:{excludeIds}
-     * TTL: 5 minutes
-     * Why: Same data for all users, frequently accessed
+     * WHY NO CACHE:
+     * - Caching JPA entities causes Redis-typed JSON leakage to REST clients
+     * - Product.brand="cosrx" → Jackson interprets as type ID → deserialization error
+     *
+     * SOLUTION:
+     * - Query database directly (indexed query, <10ms)
+     * - Clean JSON serialization via @Primary ObjectMapper
      */
-    @Cacheable(
-        value = "home:blocks",
-        key = "'new:' + #limit + ':' + (#excludeIds.isEmpty() ? 'none' : #excludeIds.hashCode())",
-        unless = "#result == null || #result.isEmpty()"
-    )
     public List<Product> getNewArrivalsBlock(int limit, List<Long> excludeIds) {
         return productRepo.newArrivalsExclude(
             excludeIds,

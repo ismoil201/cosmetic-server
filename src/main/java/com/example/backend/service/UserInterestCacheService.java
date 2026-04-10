@@ -38,19 +38,20 @@ public class UserInterestCacheService {
     private final UserInterestRepository interestRepo;
 
     /**
-     * ✅ CACHED: Category Interest Scores
+     * ⚠️ CACHE REMOVED: Category Interest Scores
      *
-     * Cache: user:interests:{userId}:CATEGORY
-     * TTL: 30 minutes
-     * Why: Changes slowly (updated on view/click), queried frequently
+     * WHY NO CACHE:
+     * - Map<String, Double> with @Cacheable causes Redis type metadata in values
+     * - When returned to REST endpoints, typed Double values leak to JSON
+     * - Potential Android deserialization errors with typed primitives
+     *
+     * SOLUTION:
+     * - Query database directly (user-specific, indexed, <5ms)
+     * - Clean Map serialization via @Primary ObjectMapper
+     * - Acceptable performance impact (interest queries are infrequent)
      *
      * Returns: Map<categoryName, score>
      */
-    @Cacheable(
-        value = "user:interests",
-        key = "#user.id + ':CATEGORY'",
-        unless = "#result == null || #result.isEmpty()"
-    )
     @Transactional(readOnly = true)
     public Map<String, Double> getCategoryScores(User user) {
         if (user == null) return Map.of();
@@ -68,19 +69,14 @@ public class UserInterestCacheService {
     }
 
     /**
-     * ✅ CACHED: Brand Interest Scores
+     * ⚠️ CACHE REMOVED: Brand Interest Scores
      *
-     * Cache: user:interests:{userId}:BRAND
-     * TTL: 30 minutes
-     * Why: Changes slowly, queried frequently in feed
+     * WHY NO CACHE:
+     * - Redis type metadata contaminates Map values
+     * - Prevents Jackson deserialization errors in Android clients
      *
      * Returns: Map<brandName, score> (lowercase)
      */
-    @Cacheable(
-        value = "user:interests",
-        key = "#user.id + ':BRAND'",
-        unless = "#result == null || #result.isEmpty()"
-    )
     @Transactional(readOnly = true)
     public Map<String, Double> getBrandScores(User user) {
         if (user == null) return Map.of();
@@ -98,19 +94,14 @@ public class UserInterestCacheService {
     }
 
     /**
-     * ✅ CACHED: Top Category Keys (for candidate selection)
+     * ⚠️ CACHE REMOVED: Top Category Keys (for candidate selection)
      *
-     * Cache: user:interests:{userId}:top4cats
-     * TTL: 30 minutes
-     * Why: Used to select product candidates by category
+     * WHY NO CACHE:
+     * - List<String> with @Cacheable causes Redis ArrayList type wrapper
+     * - Potential type metadata leakage to REST responses
      *
      * Returns: List of top 4 category names
      */
-    @Cacheable(
-        value = "user:interests",
-        key = "#user.id + ':top4cats'",
-        unless = "#result == null || #result.isEmpty()"
-    )
     @Transactional(readOnly = true)
     public List<String> getTopCategoryKeys(User user) {
         if (user == null) return List.of();
@@ -123,19 +114,13 @@ public class UserInterestCacheService {
     }
 
     /**
-     * ✅ CACHED: Top Brand Keys (for candidate selection)
+     * ⚠️ CACHE REMOVED: Top Brand Keys (for candidate selection)
      *
-     * Cache: user:interests:{userId}:top4brands
-     * TTL: 30 minutes
-     * Why: Used to select product candidates by brand
+     * WHY NO CACHE:
+     * - List<String> with Redis type metadata causes Android JSON errors
      *
      * Returns: List of top 4 brand names (lowercase)
      */
-    @Cacheable(
-        value = "user:interests",
-        key = "#user.id + ':top4brands'",
-        unless = "#result == null || #result.isEmpty()"
-    )
     @Transactional(readOnly = true)
     public List<String> getTopBrandKeys(User user) {
         if (user == null) return List.of();

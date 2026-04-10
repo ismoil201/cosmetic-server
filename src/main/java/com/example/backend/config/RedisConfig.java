@@ -49,6 +49,7 @@ public class RedisConfig {
      * - NO activateDefaultTyping() → Clean JSON without type metadata
      * - JavaTimeModule → Proper LocalDateTime/LocalDate serialization
      * - Standard JSON output → Android/iOS/Web compatible
+     * - SerializationFeature.WRITE_DATES_AS_TIMESTAMPS = false → ISO-8601 strings
      * <p>
      * DO NOT add activateDefaultTyping() to this bean!
      * Type metadata (@class, typed arrays) breaks mobile clients.
@@ -60,6 +61,9 @@ public class RedisConfig {
 
         // ✅ Support Java 8 date/time types (e.g., LocalDateTime, LocalDate)
         mapper.registerModule(new JavaTimeModule());
+
+        // ✅ CRITICAL FIX: Serialize dates as ISO-8601 strings, not arrays
+        mapper.configure(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
         // ✅ NO activateDefaultTyping() — produces clean standard JSON
         // ✅ BigDecimal → plain JSON number (not typed array)
@@ -94,6 +98,9 @@ public class RedisConfig {
 
         // ✅ Support Java 8 date/time types
         mapper.registerModule(new JavaTimeModule());
+
+        // ✅ CRITICAL: Serialize dates as ISO-8601 strings (prevents array format)
+        mapper.configure(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
         // ✅ Preserve type info for correct Redis deserialization
         // This is SAFE because it's isolated to Redis cache layer
