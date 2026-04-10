@@ -16,3 +16,19 @@ out/
 
 # JAR
 *.jar
+
+# ========================================
+# SECURITY: Environment variables & secrets
+# ========================================
+.env
+.env.local
+.env.*.local
+*.env
+application-local.yml
+application-local.properties
+**/firebase-adminsdk-*.json
+secrets/
+*.pem
+*.key
+*.p12
+*.jks
