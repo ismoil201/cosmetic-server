@@ -30,8 +30,19 @@ public class ProductController {
      */
     // 🔓 PUBLIC (TOKEN KERAK EMAS)
     @GetMapping
-    public Page<ProductResponse> list(@ParameterObject Pageable pageable) {
-        return productService.getHomeProducts(pageable);
+    public Page<ProductResponse> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        // ✅ Page/size validation
+        if (page < 0) page = 0;
+        if (size < 1) size = 20;
+        if (size > 100) size = 100;
+
+        // ✅ Create unsorted Pageable (prevents sort injection)
+        Pageable unsortedPageable = PageRequest.of(page, size);
+
+        return productService.getHomeProducts(unsortedPageable);
     }
     /**
      * PUBLIC: Product detail
@@ -46,10 +57,20 @@ public class ProductController {
     @GetMapping("/category")
     public Page<ProductCardResponse> byCategory(
             @RequestParam String category,
-            Pageable pageable
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
+        // ✅ Page/size validation
+        if (page < 0) page = 0;
+        if (size < 1) size = 20;
+        if (size > 100) size = 100;
+
         Category cat = Category.valueOf(category.toUpperCase());
-        return productService.getByCategoryCards(cat, pageable);
+
+        // ✅ Create unsorted Pageable (service handles internal sorting)
+        Pageable unsortedPageable = PageRequest.of(page, size);
+
+        return productService.getByCategoryCards(cat, unsortedPageable);
     }
 
 
@@ -100,23 +121,34 @@ public class ProductController {
     @GetMapping("/search")
     public Page<ProductCardResponse> search(
             @RequestParam(required = false, defaultValue = "") String q,
-            Pageable pageable
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
         // ✅ Safety: trim and validate
         if (q == null) q = "";
         q = q.trim();
-        
+
+        // ✅ Page/size validation: prevent DoS
+        if (page < 0) page = 0;
+        if (size < 1) size = 20;
+        if (size > 100) size = 100;
+
         // ✅ Empty query: return empty results (don't scan all products)
         if (q.isEmpty() || q.isBlank()) {
-            return org.springframework.data.domain.Page.empty(pageable);
+            return org.springframework.data.domain.Page.empty(PageRequest.of(page, size));
         }
-        
+
         // ✅ Length limit: prevent DoS
         if (q.length() > 100) {
             q = q.substring(0, 100);
         }
-        
-        return productService.search(q, pageable);
+
+        // ✅ CRITICAL FIX: Create unsorted Pageable to prevent sort injection
+        // Native query has ORDER BY relevance_score DESC, p.id DESC
+        // External sort parameters break native queries with custom ORDER BY
+        Pageable unsortedPageable = PageRequest.of(page, size);
+
+        return productService.search(q, unsortedPageable);
     }
 
     // 🔐 ADMIN
