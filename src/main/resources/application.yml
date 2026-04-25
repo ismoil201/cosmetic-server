@@ -67,8 +67,9 @@ spring:
   transaction:
     default-timeout: 30  # 30 seconds max
 
-# ✅ PRODUCTION: CORS configuration (MUST UPDATE WITH REAL DOMAINS)
+# ✅ PRODUCTION: Application Configuration
 app:
+  fast-mode: ${FAST_MODE:false}  # EMERGENCY: Disable all expensive features
   cors:
     # WARNING: Update these with your actual production domains
     # NEVER use wildcard (*) or localhost in production
@@ -135,12 +136,6 @@ analytics:
 
 rate-limit:
   enabled: ${RATE_LIMIT_ENABLED:true}  # Enable rate limiting filter
-
-# ✅ EMERGENCY: Fast Mode (disable all expensive features)
-# Set app.fast-mode=true to recover production instantly
-# Disables: personalized feed, interest updates, heavy analytics
-app:
-  fast-mode: ${FAST_MODE:false}
 
 # ✅ PRODUCTION: Logging configuration
 logging:
