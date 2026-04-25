@@ -1,5 +1,6 @@
 package com.example.backend.domain.order.service;
 
+import com.example.backend.global.exception.InsufficientStockException;
 import com.example.backend.domain.user.service.AddressService;
 import com.example.backend.domain.cart.entity.CartItem;
 import com.example.backend.domain.cart.repository.CartItemRepository;
@@ -135,13 +136,19 @@ public class OrderService {
 
             for (CartItem c : items) {
 
-                ProductVariant v = c.getVariant();
+                // 🔒 CRITICAL: Load variant with pessimistic lock to prevent race condition
+                // This ensures no other transaction can modify stock until we commit
+                ProductVariant v = variantRepo.findByIdForUpdate(c.getVariant().getId())
+                        .orElseThrow(() -> new RuntimeException("Variant not found: " + c.getVariant().getId()));
+
                 Product product = v.getProduct();
 
+                // ✅ Stock check happens AFTER acquiring lock (inside transaction)
                 if (v.getStock() < c.getQuantity()) {
-                    throw new RuntimeException("Not enough stock: " + product.getName() + " " + v.getLabel());
+                    throw new InsufficientStockException("Not enough stock: " + product.getName() + " " + v.getLabel());
                 }
 
+                // ✅ Stock decrement is safe (protected by PESSIMISTIC_WRITE lock)
                 v.setStock(v.getStock() - c.getQuantity());
                 variantRepo.save(v);
 
@@ -404,16 +411,41 @@ public class OrderService {
             }
         }
 
-        // 🔄 AGAR CANCEL BO‘LSA → STOCK QAYTADI (VARIANT STOCK)
+        // 🔄 AGAR CANCEL BO'LSA → STOCK QAYTADI (VARIANT STOCK)
         if (order.getStatus() != OrderStatus.CANCELED && newStatus == OrderStatus.CANCELED) {
 
             List<OrderItem> items = orderItemRepo.findByOrder(order);
 
             for (OrderItem item : items) {
-                ProductVariant v = item.getVariant();
-                if (v != null) {
-                    v.setStock(v.getStock() + item.getQuantity());
-                    variantRepo.save(v);
+                // 🔒 CRITICAL SAFETY: Only restore stock if SellerOrder is NOT already canceled
+                // Prevents double-restore when:
+                // 1. Seller cancels SellerOrder → stock restored
+                // 2. Admin later cancels master Order → skip already-canceled items
+                boolean sellerOrderAlreadyCanceled =
+                    item.getSellerOrder() != null &&
+                    item.getSellerOrder().getStatus() == OrderStatus.CANCELED;
+
+                if (!sellerOrderAlreadyCanceled) {
+                    ProductVariant v = item.getVariant();
+                    if (v != null) {
+                        // ✅ Restore variant stock (only if not already restored by seller cancel)
+                        v.setStock(v.getStock() + item.getQuantity());
+                        variantRepo.save(v);
+                    }
+                }
+
+                // ✅ CRITICAL FIX: Decrease soldCount if order was previously CONFIRMED
+                // Only decrease if the order had reached CONFIRMED status (where soldCount was increased)
+                if (order.getStatus() == OrderStatus.CONFIRMED ||
+                    order.getStatus() == OrderStatus.PACKED ||
+                    order.getStatus() == OrderStatus.SHIPPED ||
+                    order.getStatus() == OrderStatus.DELIVERED) {
+
+                    Product product = item.getProduct();
+                    // Prevent negative soldCount
+                    int newSoldCount = Math.max(0, product.getSoldCount() - item.getQuantity());
+                    product.setSoldCount(newSoldCount);
+                    productRepo.save(product);
                 }
             }
         }

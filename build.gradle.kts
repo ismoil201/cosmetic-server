@@ -27,6 +27,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
+    // ✅ PRODUCTION: Rate Limiting with Bucket4j + Redis
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
+    implementation("com.bucket4j:bucket4j-redis:8.10.1")
+
     // ✅ PRODUCTION: Bean Validation for request validation
     implementation("org.springframework.boot:spring-boot-starter-validation")
 

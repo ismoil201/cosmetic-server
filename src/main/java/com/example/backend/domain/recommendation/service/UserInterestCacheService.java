@@ -135,6 +135,29 @@ public class UserInterestCacheService {
     }
 
     /**
+     * ✅ STEP 10: Query Interest Scores
+     *
+     * Returns: Map<queryText, score> (lowercase, trimmed)
+     *
+     * Used for matching product names/descriptions against user's search queries
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Double> getQueryScores(User user) {
+        if (user == null) return Map.of();
+
+        List<UserInterest> interests = interestRepo
+            .findTop20ByUserAndTypeOrderByScoreDesc(user, InterestType.QUERY);
+
+        return interests.stream()
+            .filter(i -> i.getKey() != null && !i.getKey().isBlank())
+            .collect(Collectors.toMap(
+                i -> i.getKey().trim().toLowerCase(),
+                UserInterest::getScore,
+                (a, b) -> a  // Keep first if duplicate
+            ));
+    }
+
+    /**
      * ⚠️ CACHE INVALIDATION: Clear all interest caches for user
      *
      * When to call:

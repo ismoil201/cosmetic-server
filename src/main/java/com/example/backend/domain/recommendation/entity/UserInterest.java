@@ -7,7 +7,11 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name="user_interest",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id","type","key_name"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id","type","key_name"}),
+        indexes = {
+                @Index(name = "idx_user_interest_user_score", columnList = "user_id,score"),
+                @Index(name = "idx_user_interest_user_type_score", columnList = "user_id,type,score")
+        })
 @Getter @Setter
 public class UserInterest {
 
@@ -27,6 +31,13 @@ public class UserInterest {
 
     @Column(nullable=false)
     private double score;
+
+    // ✅ STEP 8: Track last event type that updated this interest
+    @Column(name="last_event_type", length=32)
+    private String lastEventType;
+
+    @Column(name="created_at", nullable=false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(name="updated_at", nullable=false)
     private LocalDateTime updatedAt = LocalDateTime.now();

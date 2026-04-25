@@ -357,15 +357,18 @@ public class ProductRecommendService {
                     });
 
             List<String> catKeys = interestRepo.topKeys(user, InterestType.CATEGORY, PageRequest.of(0, 4));
-            List<Category> cats = new ArrayList<>();
+            List<String> cats = new ArrayList<>();
             for (String k : catKeys) {
                 if (k == null) continue;
-                try { cats.add(Category.valueOf(k.trim().toUpperCase())); }
+                try {
+                    Category.valueOf(k.trim().toUpperCase()); // Validate
+                    cats.add(k.trim().toUpperCase());
+                }
                 catch (IllegalArgumentException ignore) {}
             }
             if (!cats.isEmpty()) {
                 personal.addAll(productRepo.candidatesByCategories(
-                        cats, excludeIds, excludeIds.isEmpty(), PageRequest.of(0, 200)
+                        cats, excludeIds, excludeIds.isEmpty() ? 1 : 0, 200
                 ));
             }
 
@@ -377,7 +380,7 @@ public class ProductRecommendService {
 
             if (!brands.isEmpty()) {
                 personal.addAll(productRepo.candidatesByBrands(
-                        brands, excludeIds, excludeIds.isEmpty(), PageRequest.of(0, 200)
+                        brands, excludeIds, excludeIds.isEmpty() ? 1 : 0, 200
                 ));
             }
         }
