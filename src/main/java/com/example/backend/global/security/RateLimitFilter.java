@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -50,11 +51,24 @@ public class RateLimitFilter extends OncePerRequestFilter {
     // In-memory bucket storage (simple and safe for single-instance deployment)
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
+    /**
+     * Feature flag: Enable/disable rate limiting
+     * Set to false for emergency bypass or local development
+     */
+    @Value("${rate-limit.enabled:true}")
+    private boolean rateLimitEnabled;
+
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
+
+        // ✅ EMERGENCY: Bypass rate limiting if disabled
+        if (!rateLimitEnabled) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String path = request.getRequestURI();
         String method = request.getMethod();

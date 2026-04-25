@@ -5,14 +5,18 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     # ✅ PRODUCTION: HikariCP connection pool configuration
+    # Tuned for Railway/small MySQL instances to prevent connection starvation
     hikari:
-      maximum-pool-size: 20  # Max connections (adjust based on load)
-      minimum-idle: 5  # Minimum idle connections
-      connection-timeout: 30000  # 30 seconds
-      idle-timeout: 600000  # 10 minutes
-      max-lifetime: 1800000  # 30 minutes
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:10}  # Reduced for small DB (was 20)
+      minimum-idle: ${HIKARI_MIN_IDLE:2}  # Min idle connections (was 5)
+      connection-timeout: 30000  # 30 seconds (wait for connection)
+      idle-timeout: 600000  # 10 minutes (close idle connections)
+      max-lifetime: 1800000  # 30 minutes (rotate connections)
       leak-detection-threshold: 60000  # Detect leaks after 60s
       connection-test-query: SELECT 1  # Validate connections
+      # ✅ Additional tuning for performance
+      auto-commit: true  # Default behavior, explicit for clarity
+      pool-name: HikariPool-Cosmetic  # Named pool for monitoring
 
   jpa:
     hibernate:
@@ -46,6 +50,10 @@ spring:
           min-idle: 5
           max-wait: 3000ms
       connect-timeout: 2000ms
+      # ✅ CRITICAL: Disable Redis repositories (only using Redis for cache, not data)
+      # Prevents Spring from scanning JPA repositories as Redis repositories
+      repositories:
+        enabled: false
 
   # ✅ Cache Configuration
   cache:
@@ -110,6 +118,29 @@ cloudflare:
     public-base-url: ${R2_PUBLIC_URL}  # REQUIRED: Set via environment
     access-key-id: ${R2_ACCESS_KEY}  # REQUIRED: Set via environment
     secret-access-key: ${R2_SECRET_KEY}  # REQUIRED: Set via environment
+
+# ✅ PRODUCTION: Performance Profiling & Feature Flags
+# Use these flags to diagnose global slowness and enable emergency fast mode
+performance:
+  profiling-enabled: ${PROFILING_ENABLED:true}  # Global request timing logs
+
+recommendation:
+  personalized-feed-enabled: ${PERSONALIZED_FEED_ENABLED:true}  # Personalized home feed
+  user-interest-update-enabled: ${USER_INTEREST_UPDATE_ENABLED:true}  # Update interests on events
+  event-enrichment-enabled: ${EVENT_ENRICHMENT_ENABLED:true}  # Enrich events with product data
+
+analytics:
+  event-logging-enabled: ${EVENT_LOGGING_ENABLED:true}  # Save event_logs to database
+  event-interest-update-enabled: ${EVENT_INTEREST_UPDATE_ENABLED:true}  # Alias for user-interest-update
+
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}  # Enable rate limiting filter
+
+# ✅ EMERGENCY: Fast Mode (disable all expensive features)
+# Set app.fast-mode=true to recover production instantly
+# Disables: personalized feed, interest updates, heavy analytics
+app:
+  fast-mode: ${FAST_MODE:false}
 
 # ✅ PRODUCTION: Logging configuration
 logging:

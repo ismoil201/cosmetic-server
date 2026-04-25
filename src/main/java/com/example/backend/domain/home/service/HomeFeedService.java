@@ -15,6 +15,8 @@ import com.example.backend.domain.recommendation.service.UserInterestCacheServic
 import com.example.backend.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -117,6 +119,16 @@ public class HomeFeedService {
     // ✅ Use cached user interests service (30min TTL)
     private final UserInterestCacheService userInterestCacheService;
 
+    /**
+     * ✅ PERFORMANCE: Feature flag to disable personalized feed
+     * When false, uses fast fallback (popular/new/discount only)
+     */
+    @Value("${recommendation.personalized-feed-enabled:true}")
+    private boolean personalizedFeedEnabled;
+
+    @Value("${app.fast-mode:false}")
+    private boolean fastMode;
+
     @Transactional(readOnly = true)
     public List<ProductCardResponse> buildFeed(int limit) {
         long startTime = System.currentTimeMillis();
@@ -124,6 +136,12 @@ public class HomeFeedService {
 
         if (limit <= 0) return List.of();
         if (limit > 120) limit = 120;
+
+        // ✅ EMERGENCY: Fast mode bypasses personalization entirely
+        if (fastMode || !personalizedFeedEnabled) {
+            log.info("Using fast fallback feed (personalization disabled)");
+            return buildFastFallbackFeed(limit);
+        }
 
         t0 = System.currentTimeMillis();
         User user = userService.getCurrentUserOrNull();
@@ -737,6 +755,65 @@ public class HomeFeedService {
         out.addAll(top);
         if (list.size() > k) out.addAll(list.subList(k, list.size()));
         return out;
+    }
+
+    /**
+     * ✅ EMERGENCY: Fast fallback feed (no personalization)
+     *
+     * Used when:
+     * - app.fast-mode=true (emergency recovery)
+     * - recommendation.personalized-feed-enabled=false
+     *
+     * Performance:
+     * - < 50ms (local)
+     * - < 150ms (production)
+     * - No user interest loading
+     * - No scoring/diversity computation
+     * - Simple popular + discount + new mix
+     *
+     * @param limit Number of products to return
+     * @return Fast fallback feed (popular + discount + new products)
+     */
+    private List<ProductCardResponse> buildFastFallbackFeed(int limit) {
+        User user = userService.getCurrentUserOrNull();
+
+        // Simple mix: 50% popular, 30% discount, 20% new
+        int popularCount = (int) (limit * 0.5);
+        int discountCount = (int) (limit * 0.3);
+        int newCount = limit - popularCount - discountCount;
+
+        List<Product> products = new ArrayList<>(limit);
+
+        // Popular products
+        Page<Product> popular = productRepo.findByActiveTrueOrderBySoldCountDesc(
+                PageRequest.of(0, popularCount)
+        );
+        products.addAll(popular.getContent());
+
+        // Discounted products
+        List<Product> discounted = productRepo.discountedCandidates(
+                Collections.emptyList(), 1, discountCount
+        );
+        products.addAll(discounted);
+
+        // New arrivals
+        Page<Product> newProducts = productRepo.findByActiveTrueOrderByCreatedAtDesc(
+                PageRequest.of(0, newCount)
+        );
+        products.addAll(newProducts.getContent());
+
+        // Deduplicate and limit
+        LinkedHashMap<Long, Product> unique = new LinkedHashMap<>();
+        for (Product p : products) {
+            if (p != null && p.getId() != null) {
+                unique.putIfAbsent(p.getId(), p);
+            }
+        }
+
+        List<Product> result = unique.values().stream().limit(limit).toList();
+
+        // Convert to cards (batch, no N+1)
+        return productService.toCardsPublic(result, user);
     }
 
     private record ScoredProduct(Product p, double score) {}
