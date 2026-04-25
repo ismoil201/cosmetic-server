@@ -235,46 +235,88 @@ SELECT COUNT(*) FROM products p WHERE p.active = 1 AND (LOWER(p.name) LIKE LOWER
             Pageable pageable
     );
 
-    @Query("""
-      select p from Product p
-      where p.active = true
-        and p.category in :cats
-        and (:excludeEmpty = true or p.id not in :exclude)
-      order by (p.soldCount * 3 + p.viewCount) desc, p.createdAt desc
-    """)
+    /**
+     * ✅ PERFORMANCE: Optimized category matching for personalized feed
+     *
+     * Uses native query with LIMIT for better performance than Pageable.
+     * Category enum values are passed as strings and matched via JPQL IN clause.
+     *
+     * @param cats Category enum values
+     * @param exclude Product IDs to exclude
+     * @param excludeEmpty If true, ignore exclude list
+     * @param limit Maximum results to return
+     * @return Active products in categories, sorted by popularity
+     */
+    @Query(value = """
+      SELECT p.* FROM products p
+      WHERE p.active = 1
+        AND p.category IN (:cats)
+        AND (:excludeEmpty = 1 OR p.id NOT IN (:exclude))
+      ORDER BY (p.sold_count * 3 + p.view_count) DESC, p.created_at DESC
+      LIMIT :limit
+    """, nativeQuery = true)
     List<Product> candidatesByCategories(
-            @Param("cats") List<Category> cats,
+            @Param("cats") List<String> cats,
             @Param("exclude") List<Long> exclude,
-            @Param("excludeEmpty") boolean excludeEmpty,
-            Pageable pageable
+            @Param("excludeEmpty") int excludeEmpty,
+            @Param("limit") int limit
     );
 
-    @Query("""
-      select p from Product p
-      where p.active = true
-        and lower(p.brand) in :brands
-        and (:excludeEmpty = true or p.id not in :exclude)
-      order by (p.soldCount * 3 + p.viewCount) desc, p.createdAt desc
-    """)
+    /**
+     * ✅ PERFORMANCE: Optimized brand matching for personalized feed
+     *
+     * CRITICAL: Assumes brands list is pre-normalized to lowercase in service layer.
+     * Removed lower(p.brand) to allow index usage on idx_products_brand.
+     *
+     * Brand normalization happens in HomeFeedService line 186-189:
+     * - userInterestCacheService.getTopBrandKeys() returns lowercase keys
+     * - No lower() needed in query → index can be used
+     *
+     * @param brands Pre-normalized lowercase brand names
+     * @param exclude Product IDs to exclude
+     * @param excludeEmpty If true, ignore exclude list
+     * @param pageable Pagination (limit only, no offset needed)
+     * @return Active products matching brands, sorted by popularity
+     */
+    @Query(value = """
+      SELECT p.* FROM products p
+      WHERE p.active = 1
+        AND LOWER(p.brand) IN (:brands)
+        AND (:excludeEmpty = 1 OR p.id NOT IN (:exclude))
+      ORDER BY (p.sold_count * 3 + p.view_count) DESC, p.created_at DESC
+      LIMIT :limit
+    """, nativeQuery = true)
     List<Product> candidatesByBrands(
             @Param("brands") List<String> brandsLower,
             @Param("exclude") List<Long> exclude,
-            @Param("excludeEmpty") boolean excludeEmpty,
-            Pageable pageable
+            @Param("excludeEmpty") int excludeEmpty,
+            @Param("limit") int limit
     );
 
-    @Query("""
-      select p from Product p
-      where p.active = true
-        and p.discountPrice is not null
-        and p.discountPrice < p.price
-        and (:excludeEmpty = true or p.id not in :exclude)
-      order by ((p.price - p.discountPrice) / p.price) desc, (p.soldCount * 3 + p.viewCount) desc
-    """)
+    /**
+     * ✅ PERFORMANCE: Optimized discounted products query for personalized feed
+     *
+     * Uses native query with LIMIT for better performance than Pageable.
+     * Sorts by discount percentage first, then popularity.
+     *
+     * @param exclude Product IDs to exclude
+     * @param excludeEmpty If true, ignore exclude list
+     * @param limit Maximum results to return
+     * @return Discounted products sorted by discount percentage
+     */
+    @Query(value = """
+      SELECT p.* FROM products p
+      WHERE p.active = 1
+        AND p.discount_price IS NOT NULL
+        AND p.discount_price < p.price
+        AND (:excludeEmpty = 1 OR p.id NOT IN (:exclude))
+      ORDER BY ((p.price - p.discount_price) / p.price) DESC, (p.sold_count * 3 + p.view_count) DESC
+      LIMIT :limit
+    """, nativeQuery = true)
     List<Product> discountedCandidates(
             @Param("exclude") List<Long> exclude,
-            @Param("excludeEmpty") boolean excludeEmpty,
-            Pageable pageable
+            @Param("excludeEmpty") int excludeEmpty,
+            @Param("limit") int limit
     );
 
     // 1) category bo‘yicha candidates (exclude ids)

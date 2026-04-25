@@ -14,6 +14,7 @@ import com.example.backend.domain.product.service.ProductService;
 import com.example.backend.domain.recommendation.service.UserInterestCacheService;
 import com.example.backend.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +60,7 @@ import java.util.*;
  * - < 100ms for authenticated users
  * - < 50ms for guests
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class HomeFeedService {
@@ -82,6 +84,27 @@ public class HomeFeedService {
     // Blend ratio
     private static final double PERSONAL_RATIO = 0.70;  // 70% personalized, 30% explore
 
+    // =====================================================
+    // ✅ PRODUCTION: Performance monitoring thresholds
+    // =====================================================
+    /**
+     * Slow request threshold (ms) - log INFO for monitoring
+     * Triggered when feed generation takes longer than normal but acceptable
+     */
+    private static final long SLOW_FEED_THRESHOLD_MS = 500;
+
+    /**
+     * Very slow request threshold (ms) - log WARN for investigation
+     * Triggered when feed generation is dangerously slow, requires attention
+     */
+    private static final long VERY_SLOW_FEED_THRESHOLD_MS = 1000;
+
+    /**
+     * Maximum expected candidate count
+     * Exceeding this indicates fetch limit controls are not working correctly
+     */
+    private static final int MAX_EXPECTED_CANDIDATES = 350;
+
     private final EventTrackingService eventTrackingService;
     private final UserService userService;
     private final UserInterestRepository interestRepo;
@@ -96,11 +119,16 @@ public class HomeFeedService {
 
     @Transactional(readOnly = true)
     public List<ProductCardResponse> buildFeed(int limit) {
+        long startTime = System.currentTimeMillis();
+        long t0, t1;
 
         if (limit <= 0) return List.of();
         if (limit > 120) limit = 120;
 
+        t0 = System.currentTimeMillis();
         User user = userService.getCurrentUserOrNull();
+        t1 = System.currentTimeMillis();
+        long authMs = t1 - t0;
 
         // ✅ STABLE seed: kuniga 1 marta o‘zgaradi (scroll/pagination sakrashini kamaytiradi)
         String seed = (user != null)
@@ -112,22 +140,29 @@ public class HomeFeedService {
         int fetch = Math.max(limit * 3, 60);
 
         // 0) Negative feedback
+        t0 = System.currentTimeMillis();
         if (user != null) {
             negativeFeedbackService.applyIfNeeded(user);
         }
+        t1 = System.currentTimeMillis();
+        long negativeFeedbackMs = t1 - t0;
 
-        // 1) seen (oxirgi 3 kunda ko‘rilganlar)
+        // 1) seen (oxirgi 3 kunda ko'rilganlar)
+        t0 = System.currentTimeMillis();
         Set<Long> seenSet = new HashSet<>();
         if (user != null) {
             seenSet.addAll(eventRepo.findProductIdsAfter(
                     user, EventType.VIEW, LocalDateTime.now().minusDays(3)
             ));
         }
+        t1 = System.currentTimeMillis();
+        long seenMs = t1 - t0;
 
         List<Long> excludeSoft = new ArrayList<>(seenSet);
         boolean excludeSoftEmpty = excludeSoft.isEmpty();
 
         // 2) ✅ STEP 10: Load all user interests (CACHED: 30min TTL)
+        t0 = System.currentTimeMillis();
         Map<String, Double> catScore = (user != null)
             ? userInterestCacheService.getCategoryScores(user)
             : new HashMap<>();
@@ -140,23 +175,36 @@ public class HomeFeedService {
         Map<String, Double> queryScore = (user != null)
             ? userInterestCacheService.getQueryScores(user)
             : new HashMap<>();
+        t1 = System.currentTimeMillis();
+        long interestsMs = t1 - t0;
 
         // 3) candidates: PERSONAL (interest) + EXPLORE (global)
+        t0 = System.currentTimeMillis();
         List<Product> personalCandidates = new ArrayList<>();
         List<Product> exploreCandidates = new ArrayList<>();
+
+        // ✅ PERFORMANCE: Cap fetch sizes to avoid loading 500+ products
+        int catFetch = Math.min(fetch, 100);    // Max 100 per category pool
+        int brandFetch = Math.min(fetch, 100);  // Max 100 per brand pool
+        int discountFetch = Math.min(fetch, 80);
+        int popularFetch = Math.min(fetch, 80);
+        int newFetch = Math.min(fetch, 80);
 
         if (user != null) {
             // ✅ CACHED: top categories (30min TTL)
             List<String> catKeys = userInterestCacheService.getTopCategoryKeys(user);
-            List<Category> cats = new ArrayList<>();
+            List<String> catStrings = new ArrayList<>();
             for (String k : catKeys) {
                 if (k == null) continue;
-                try { cats.add(Category.valueOf(k.trim().toUpperCase())); }
+                try {
+                    Category.valueOf(k.trim().toUpperCase()); // Validate
+                    catStrings.add(k.trim().toUpperCase());
+                }
                 catch (IllegalArgumentException ignore) {}
             }
-            if (!cats.isEmpty()) {
+            if (!catStrings.isEmpty()) {
                 personalCandidates.addAll(productRepo.candidatesByCategories(
-                        cats, excludeSoft, excludeSoftEmpty, PageRequest.of(0, Math.min(fetch, 200))
+                        catStrings, excludeSoft, excludeSoftEmpty ? 1 : 0, catFetch
                 ));
             }
 
@@ -168,21 +216,23 @@ public class HomeFeedService {
 
             if (!brands.isEmpty()) {
                 personalCandidates.addAll(productRepo.candidatesByBrands(
-                        brands, excludeSoft, excludeSoftEmpty, PageRequest.of(0, Math.min(fetch, 200))
+                        brands, excludeSoft, excludeSoftEmpty ? 1 : 0, brandFetch
                 ));
             }
         }
 
         // EXPLORE: discounted + popular + new (seen exclude bilan)
         exploreCandidates.addAll(productRepo.discountedCandidates(
-                excludeSoft, excludeSoftEmpty, PageRequest.of(0, Math.min(fetch, 200))
+                excludeSoft, excludeSoftEmpty ? 1 : 0, discountFetch
         ));
         exploreCandidates.addAll(productRepo.findByActiveTrueOrderBySoldCountDesc(
-                PageRequest.of(0, Math.min(fetch, 200))
+                PageRequest.of(0, popularFetch)
         ).getContent());
         exploreCandidates.addAll(productRepo.findByActiveTrueOrderByCreatedAtDesc(
-                PageRequest.of(0, Math.min(fetch, 120))
+                PageRequest.of(0, newFetch)
         ).getContent());
+        t1 = System.currentTimeMillis();
+        long candidatesMs = t1 - t0;
 
         // ✅ STEP 9: Dynamic diversity limits based on catalog size
         int poolSizeGuess = personalCandidates.size() + exploreCandidates.size();
@@ -190,11 +240,15 @@ public class HomeFeedService {
         int maxPerCategory = MAX_PER_CATEGORY;
 
         // 4) ✅ STEP 10: Scoring with QUERY interest matching
+        t0 = System.currentTimeMillis();
         double seenPenalty = calcSeenPenalty(poolSizeGuess);
         List<ScoredProduct> personalScored = scoreAndSort(personalCandidates, catScore, brandScore, queryScore, seenSet, seenPenalty);
         List<ScoredProduct> exploreScored = scoreAndSort(exploreCandidates, catScore, brandScore, queryScore, seenSet, seenPenalty);
+        t1 = System.currentTimeMillis();
+        long scoringMs = t1 - t0;
 
         // 5) ✅ STEP 9: Blend 70% personal + 30% explore (graceful fallback if personal empty)
+        t0 = System.currentTimeMillis();
         int personalCount = (user == null || personalScored.isEmpty())
                 ? 0
                 : (int) Math.round(limit * PERSONAL_RATIO);
@@ -207,7 +261,7 @@ public class HomeFeedService {
                 maxPerCategory, maxPerBrand
         );
 
-        // 6) Fallback: seen exclude sabab yetmasa -> seen ni qaytaramiz (exclude yo‘q)
+        // 6) Fallback: seen exclude sabab yetmasa -> seen ni qaytaramiz (exclude yo'q)
         if (blended.size() < limit) {
             List<Product> more = productRepo.findByActiveTrueOrderBySoldCountDesc(
                     PageRequest.of(0, Math.max(fetch * 2, 120))
@@ -222,13 +276,110 @@ public class HomeFeedService {
 
         // 7) Top pool shuffle
         blended = shuffleTopPool(blended, limit, rnd);
+        t1 = System.currentTimeMillis();
+        long diversityMs = t1 - t0;
 
         // 8) impressions log
 
 
-        // 9) toCard (✅ batch: N+1 yo‘q)
+        // 9) toCard (✅ batch: N+1 yo'q)
+        t0 = System.currentTimeMillis();
         List<Product> picked = blended.stream().limit(limit).toList();
-        return productService.toCardsPublic(picked, user);
+        List<ProductCardResponse> result = productService.toCardsPublic(picked, user);
+        t1 = System.currentTimeMillis();
+        long toCardsMs = t1 - t0;
+
+        long totalMs = System.currentTimeMillis() - startTime;
+
+        // ✅ PRODUCTION-SAFE PERFORMANCE LOGGING
+        // Only log slow requests to avoid spamming production logs
+        logPerformance(user, limit, catScore, brandScore, queryScore, poolSizeGuess,
+                authMs, negativeFeedbackMs, seenMs, interestsMs, candidatesMs,
+                scoringMs, diversityMs, toCardsMs, totalMs);
+
+        return result;
+    }
+
+    /**
+     * ✅ PRODUCTION: Production-safe performance logging
+     *
+     * Logging levels based on performance:
+     * - WARN: totalMs > 1000ms (very slow, requires investigation)
+     * - INFO: totalMs > 500ms (slow, monitor for patterns)
+     * - DEBUG: totalMs <= 500ms (normal, detailed metrics)
+     *
+     * Security:
+     * - Log userId (safe for correlation, not PII)
+     * - Do NOT log: tokens, emails, names, sensitive data
+     *
+     * @param user Current user (may be null for guest)
+     * @param limit Requested feed size
+     * @param catScore Category interest scores
+     * @param brandScore Brand interest scores
+     * @param queryScore Query interest scores
+     * @param candidates Total candidates loaded
+     * @param authMs User auth lookup time
+     * @param negativeFeedbackMs Negative feedback check time
+     * @param seenMs Recently viewed products query time
+     * @param interestsMs User interests cache lookup time
+     * @param candidatesMs Candidate loading time (DB queries)
+     * @param scoringMs Scoring algorithm time
+     * @param diversityMs Diversity filtering time
+     * @param toCardsMs ProductCardResponse conversion time
+     * @param totalMs Total request time
+     */
+    private void logPerformance(User user, int limit,
+                                Map<String, Double> catScore,
+                                Map<String, Double> brandScore,
+                                Map<String, Double> queryScore,
+                                int candidates,
+                                long authMs, long negativeFeedbackMs, long seenMs,
+                                long interestsMs, long candidatesMs, long scoringMs,
+                                long diversityMs, long toCardsMs, long totalMs) {
+
+        String userId = (user != null) ? String.valueOf(user.getId()) : "guest";
+        int totalInterests = catScore.size() + brandScore.size() + queryScore.size();
+
+        String perfMsg = String.format(
+                "[home-feed] userId=%s limit=%d interests=%d candidates=%d " +
+                        "authMs=%d negativeFeedbackMs=%d seenMs=%d interestsMs=%d candidatesMs=%d " +
+                        "scoringMs=%d diversityMs=%d toCardsMs=%d totalMs=%d",
+                userId, limit, totalInterests, candidates,
+                authMs, negativeFeedbackMs, seenMs, interestsMs, candidatesMs,
+                scoringMs, diversityMs, toCardsMs, totalMs
+        );
+
+        // ✅ Warn if candidate count exceeds expected maximum (indicates bug in fetch limits)
+        if (candidates > MAX_EXPECTED_CANDIDATES) {
+            log.warn("[home-feed] ALERT: Candidate count {} exceeds maximum expected {} - " +
+                            "fetch limit controls may not be working correctly. userId={}",
+                    candidates, MAX_EXPECTED_CANDIDATES, userId);
+        }
+
+        // ✅ Tiered logging based on performance
+        if (totalMs > VERY_SLOW_FEED_THRESHOLD_MS) {
+            // Very slow request - WARN level for immediate attention
+            log.warn("[PERF] VERY SLOW FEED: {}", perfMsg);
+
+            // Log breakdown of slow components for investigation
+            if (candidatesMs > 200) {
+                log.warn("[home-feed] Slow candidate loading: {}ms (DB query performance issue?)", candidatesMs);
+            }
+            if (toCardsMs > 100) {
+                log.warn("[home-feed] Slow card conversion: {}ms (N+1 query issue?)", toCardsMs);
+            }
+            if (interestsMs > 50) {
+                log.warn("[home-feed] Slow interest lookup: {}ms (cache miss or Redis slow?)", interestsMs);
+            }
+
+        } else if (totalMs > SLOW_FEED_THRESHOLD_MS) {
+            // Slow request - INFO level for monitoring trends
+            log.info("[PERF] SLOW FEED: {}", perfMsg);
+
+        } else {
+            // Normal request - DEBUG level (disabled in production by default)
+            log.debug("[PERF] {}", perfMsg);
+        }
     }
 
     private double calcSeenPenalty(int poolSizeGuess) {
