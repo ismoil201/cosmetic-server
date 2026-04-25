@@ -1,9 +1,9 @@
 package com.example.backend.security;
 
-import com.example.backend.exception.NotFoundException;
-import com.example.backend.repository.*;
-import com.example.backend.service.SellerProductService;
-import com.example.backend.service.SellerService;
+import com.example.backend.domain.product.repository.*;
+import com.example.backend.global.exception.NotFoundException;
+import com.example.backend.domain.seller.service.SellerProductService;
+import com.example.backend.domain.seller.service.SellerService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;

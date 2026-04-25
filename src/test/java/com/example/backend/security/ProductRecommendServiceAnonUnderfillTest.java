@@ -1,15 +1,15 @@
 package com.example.backend.security;
 
-import com.example.backend.dto.ProductCardResponse;
-import com.example.backend.dto.ProductRecommendResponse;
-import com.example.backend.entity.Product;
-import com.example.backend.repository.EventLogRepository;
-import com.example.backend.repository.ProductRepository;
-import com.example.backend.repository.UserInterestRepository;
-import com.example.backend.service.NegativeFeedbackService;
-import com.example.backend.service.ProductRecommendService;
-import com.example.backend.service.ProductService;
-import com.example.backend.service.UserService;
+import com.example.backend.domain.product.dto.ProductCardResponse;
+import com.example.backend.domain.recommendation.dto.ProductRecommendResponse;
+import com.example.backend.domain.product.entity.Product;
+import com.example.backend.domain.event.repository.EventLogRepository;
+import com.example.backend.domain.product.repository.ProductRepository;
+import com.example.backend.domain.recommendation.repository.UserInterestRepository;
+import com.example.backend.domain.recommendation.service.NegativeFeedbackService;
+import com.example.backend.domain.recommendation.service.ProductRecommendService;
+import com.example.backend.domain.product.service.ProductService;
+import com.example.backend.domain.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 

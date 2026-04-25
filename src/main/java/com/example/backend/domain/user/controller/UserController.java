@@ -1,0 +1,27 @@
+package com.example.backend.domain.user.controller;
+
+import com.example.backend.domain.user.dto.UserProfileResponse;
+import com.example.backend.domain.user.service.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/users")
+@RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
+public class UserController {
+
+    private final UserService userService;
+
+    @GetMapping("/me")
+    public UserProfileResponse me() {
+        return userService.getProfile();
+    }
+
+    @PutMapping("/me")
+    public String update(@RequestBody UserProfileResponse req) {
+        userService.updateProfile(req);
+        return "Updated";
+    }
+}

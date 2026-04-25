@@ -1,6 +1,7 @@
 package com.example.backend.security;
 
-import com.example.backend.service.JwtService;
+import com.example.backend.global.security.JwtFilter;
+import com.example.backend.global.security.JwtService;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
