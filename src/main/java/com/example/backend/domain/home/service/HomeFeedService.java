@@ -127,13 +127,18 @@ public class HomeFeedService {
         List<Long> excludeSoft = new ArrayList<>(seenSet);
         boolean excludeSoftEmpty = excludeSoft.isEmpty();
 
-        // 2) ✅ CACHED: interest map (30min TTL)
+        // 2) ✅ STEP 10: Load all user interests (CACHED: 30min TTL)
         Map<String, Double> catScore = (user != null)
             ? userInterestCacheService.getCategoryScores(user)
             : new HashMap<>();
 
         Map<String, Double> brandScore = (user != null)
             ? userInterestCacheService.getBrandScores(user)
+            : new HashMap<>();
+
+        // ✅ STEP 10: Load QUERY interests for matching
+        Map<String, Double> queryScore = (user != null)
+            ? userInterestCacheService.getQueryScores(user)
             : new HashMap<>();
 
         // 3) candidates: PERSONAL (interest) + EXPLORE (global)
@@ -184,10 +189,10 @@ public class HomeFeedService {
         int maxPerBrand = (poolSizeGuess <= 80) ? MAX_PER_BRAND_SMALL_CATALOG : MAX_PER_BRAND_LARGE_CATALOG;
         int maxPerCategory = MAX_PER_CATEGORY;
 
-        // 4) scoring
-        double seenPenalty = calcSeenPenalty(poolSizeGuess); // kichik katalogda yumshoq
-        List<ScoredProduct> personalScored = scoreAndSort(personalCandidates, catScore, brandScore, seenSet, seenPenalty);
-        List<ScoredProduct> exploreScored = scoreAndSort(exploreCandidates, catScore, brandScore, seenSet, seenPenalty);
+        // 4) ✅ STEP 10: Scoring with QUERY interest matching
+        double seenPenalty = calcSeenPenalty(poolSizeGuess);
+        List<ScoredProduct> personalScored = scoreAndSort(personalCandidates, catScore, brandScore, queryScore, seenSet, seenPenalty);
+        List<ScoredProduct> exploreScored = scoreAndSort(exploreCandidates, catScore, brandScore, queryScore, seenSet, seenPenalty);
 
         // 5) ✅ STEP 9: Blend 70% personal + 30% explore (graceful fallback if personal empty)
         int personalCount = (user == null || personalScored.isEmpty())
@@ -209,7 +214,7 @@ public class HomeFeedService {
             ).getContent();
 
             List<ScoredProduct> moreScored = scoreAndSort(
-                    more, catScore, brandScore, Collections.emptySet(), 0.0
+                    more, catScore, brandScore, queryScore, Collections.emptySet(), 0.0
             );
 
             blended = mergeFill(blended, moreScored, limit, maxPerCategory, maxPerBrand);
@@ -235,6 +240,7 @@ public class HomeFeedService {
     private List<ScoredProduct> scoreAndSort(List<Product> list,
                                              Map<String, Double> catScore,
                                              Map<String, Double> brandScore,
+                                             Map<String, Double> queryScore,
                                              Set<Long> seenSet,
                                              double seenPenaltyValue) {
 
@@ -247,7 +253,7 @@ public class HomeFeedService {
 
         List<ScoredProduct> scored = new ArrayList<>(uniq.size());
         for (Product p : uniq.values()) {
-            scored.add(new ScoredProduct(p, score(p, catScore, brandScore, seenSet, seenPenaltyValue)));
+            scored.add(new ScoredProduct(p, score(p, catScore, brandScore, queryScore, seenSet, seenPenaltyValue)));
         }
 
         scored.sort((a, b) -> Double.compare(b.score, a.score));
@@ -255,12 +261,12 @@ public class HomeFeedService {
     }
 
     /**
-     * ✅ STEP 9: Multi-dimensional product scoring
+     * ✅ STEP 10: Multi-dimensional product scoring with QUERY matching
      *
      * Scoring Formula (normalized to 0-100 scale):
      * - categoryInterest × 40%  (User's category preference)
      * - brandInterest × 25%     (User's brand preference)
-     * - queryInterest × 15%     (Future: match search_text against user queries)
+     * - queryInterest × 15%     (Match product fields against user search queries)
      * - popularity × 10%        (Global popularity signal)
      * - discount × 5%           (Discount percentage boost)
      * - recency × 3%            (New arrival boost)
@@ -270,6 +276,7 @@ public class HomeFeedService {
      * @param p Product to score
      * @param catScore User's category interest scores
      * @param brandScore User's brand interest scores
+     * @param queryScore User's query interest scores
      * @param seenSet Recently viewed product IDs
      * @param seenPenaltyValue Penalty for seen products
      * @return Final score (higher = better match)
@@ -277,6 +284,7 @@ public class HomeFeedService {
     private double score(Product p,
                          Map<String, Double> catScore,
                          Map<String, Double> brandScore,
+                         Map<String, Double> queryScore,
                          Set<Long> seenSet,
                          double seenPenaltyValue) {
 
@@ -293,9 +301,8 @@ public class HomeFeedService {
             brandInterestScore = brandScore.getOrDefault(key, 0.0) * WEIGHT_BRAND_INTEREST;
         }
 
-        // 3) Query interest (0-15 points) - Future: match search_text
-        double queryInterestScore = 0.0;
-        // TODO: Match product.searchText against user's QUERY interests
+        // 3) ✅ STEP 10: Query interest (0-15 points) - Match against product fields
+        double queryInterestScore = matchQueryInterests(p, queryScore);
 
         // 4) Popularity score (0-10 points)
         // Normalize: typical popular product has ~100-500 soldCount + viewCount
@@ -351,6 +358,67 @@ public class HomeFeedService {
                 + stockScore
                 + todayDealBoost
                 - seenPenalty;
+    }
+
+    /**
+     * ✅ STEP 10: Match user's QUERY interests against product fields
+     *
+     * Matches queries against: name, searchText, description, brand, category
+     * Uses case-insensitive substring matching
+     * Caps total boost if multiple queries match same product
+     *
+     * @param p Product to check
+     * @param queryScore Map of query interests (query → score)
+     * @return Query interest score contribution (0-15 points)
+     */
+    private double matchQueryInterests(Product p, Map<String, Double> queryScore) {
+        if (queryScore == null || queryScore.isEmpty()) return 0.0;
+
+        // Build searchable text from product fields (normalized)
+        String productText = buildSearchableText(p);
+
+        double totalQueryScore = 0.0;
+        int matchCount = 0;
+
+        for (Map.Entry<String, Double> entry : queryScore.entrySet()) {
+            String query = entry.getKey(); // Already lowercase from cache
+            double score = entry.getValue();
+
+            if (productText.contains(query)) {
+                totalQueryScore += score;
+                matchCount++;
+            }
+        }
+
+        // Cap boost: max 2 queries can contribute full weight
+        double cappedScore = totalQueryScore;
+        if (matchCount > 2) {
+            cappedScore = Math.min(totalQueryScore, queryScore.values().stream()
+                    .sorted(Comparator.reverseOrder())
+                    .limit(2)
+                    .mapToDouble(Double::doubleValue)
+                    .sum());
+        }
+
+        return cappedScore * WEIGHT_QUERY_INTEREST;
+    }
+
+    /**
+     * ✅ STEP 10: Build searchable text from product fields
+     *
+     * Combines all searchable product fields into single normalized string
+     *
+     * @param p Product
+     * @return Lowercase concatenated searchable text
+     */
+    private String buildSearchableText(Product p) {
+        StringBuilder sb = new StringBuilder();
+        if (p.getName() != null) sb.append(p.getName().toLowerCase()).append(" ");
+        if (p.getSearchText() != null) sb.append(p.getSearchText().toLowerCase()).append(" ");
+        if (p.getDescription() != null) sb.append(p.getDescription().toLowerCase()).append(" ");
+        if (p.getBrand() != null) sb.append(p.getBrand().toLowerCase()).append(" ");
+        if (p.getCategory() != null) sb.append(p.getCategory().name().toLowerCase()).append(" ");
+        return sb.toString();
     }
 
     /**
