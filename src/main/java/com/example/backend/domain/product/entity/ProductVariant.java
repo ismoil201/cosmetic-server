@@ -39,4 +39,8 @@ public class ProductVariant {
 
     @Column(name="sort_order")
     private int sortOrder = 0;
+
+    // 🔒 CRITICAL: Optimistic locking for concurrent stock updates
+    @Version
+    private Long version;
 }

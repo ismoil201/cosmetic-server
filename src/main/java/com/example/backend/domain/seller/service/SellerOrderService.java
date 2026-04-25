@@ -5,6 +5,7 @@ import com.example.backend.domain.seller.entity.SellerOrder;
 import com.example.backend.domain.user.entity.User;
 import com.example.backend.domain.order.repository.OrderItemRepository;
 import com.example.backend.domain.product.repository.ProductRepository;
+import com.example.backend.domain.product.repository.ProductVariantRepository;
 import com.example.backend.domain.seller.repository.SellerOrderRepository;
 import com.example.backend.domain.user.repository.UserRepository;
 import com.example.backend.domain.user.service.CurrentUserService;
@@ -24,6 +25,7 @@ public class SellerOrderService {
 
     private final OrderItemRepository orderItemRepo;
     private final ProductRepository productRepo;
+    private final ProductVariantRepository variantRepo;
     // SellerOrderService ichiga qo'shing
     private final OrderService orderService;
     private final SellerOrderRepository sellerOrderRepository;
@@ -129,12 +131,24 @@ public class SellerOrderService {
             }
         }
     }
+    /**
+     * 🔄 CRITICAL: Restore stock to ProductVariant when seller cancels order
+     *
+     * BUG FIX: Previously restored to Product.stock (wrong entity)
+     * NOW: Correctly restores to ProductVariant.stock
+     *
+     * Note: This method is called only when transitioning to CANCELED status
+     * The validateTransition() already prevents duplicate cancellation
+     */
     private void restoreStockForSellerOrder(Long sellerOrderId) {
         var items = orderItemRepo.findBySellerOrderId(sellerOrderId);
         for (var item : items) {
-            var p = item.getProduct();
-            p.setStock(p.getStock() + item.getQuantity());
-            productRepo.save(p);
+            // ✅ CRITICAL FIX: Restore to ProductVariant.stock, not Product.stock
+            var variant = item.getVariant();
+            if (variant != null) {
+                variant.setStock(variant.getStock() + item.getQuantity());
+                variantRepo.save(variant);
+            }
         }
     }
     /**

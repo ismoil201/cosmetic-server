@@ -1,6 +1,7 @@
 package com.example.backend.global.config;
 
 import com.example.backend.global.security.JwtFilter;
+import com.example.backend.global.security.RateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
+    private final RateLimitFilter rateLimitFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -30,6 +32,7 @@ public class SecurityConfig {
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // Public endpoints
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/home/**").permitAll()
@@ -37,18 +40,32 @@ public class SecurityConfig {
                         .requestMatchers("/api/reviews/product/**").permitAll()
                         .requestMatchers("/api/banners/**").permitAll()
 
+                        // Role-specific endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/seller/**").hasRole("SELLER")
 
+                        // Swagger/Docs
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/error"
                         ).permitAll()
+
+                        // All other endpoints require authentication
+                        // This includes:
+                        // - /api/uploads/** (presigned upload URLs)
+                        // - /api/orders/** (user orders)
+                        // - /api/cart/** (shopping cart)
+                        // - /api/favorites/** (user favorites)
+                        // - etc.
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                // CRITICAL: Filter order matters!
+                // 1. JwtFilter - extracts userId from JWT token
+                // 2. RateLimitFilter - uses userId for rate limiting (must run AFTER JwtFilter)
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(rateLimitFilter, JwtFilter.class);
 
         return http.build();
     }
